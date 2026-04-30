@@ -15,12 +15,15 @@ $UninstallRegKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Op
 $NodeRegKey = "HKLM:\SOFTWARE\Node.js"
 
 function Test-IsAdmin {
+    [CmdletBinding()]
+    param()
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
 function Start-ElevatedSelf {
+    [CmdletBinding()]
     param(
         [switch]$FromTempFlag,
         [switch]$QuietFlag

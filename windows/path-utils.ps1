@@ -1,5 +1,7 @@
 # 64 位系统上 32 位 powershell 的 ProgramFiles 可能指向 (x86)；优先 ProgramW6432 指向原生 Program Files
 function Get-ProgramFilesNodeInstallRoot {
+    [CmdletBinding()]
+    param()
     $root = $env:ProgramFiles
     if (-not [string]::IsNullOrEmpty($env:ProgramW6432)) {
         $root = $env:ProgramW6432
@@ -9,6 +11,8 @@ function Get-ProgramFilesNodeInstallRoot {
 
 # 广播 WM_SETTINGCHANGE，使新进程尽早读到更新后的 Machine/User 环境变量（当前会话 PATH 仍可能为缓存）
 function Send-EnvironmentChangeBroadcast {
+    [CmdletBinding()]
+    param()
     # 多次点载时避免重复 Add-Type 报错
     if (-not ('OpenClawInstaller.NativeMethods' -as [type])) {
         Add-Type -TypeDefinition @"
@@ -47,6 +51,7 @@ public static class NativeMethods {
 
 # PATH 追加幂等（忽略尾部 \ 与大小写差异）
 function Add-PathEntryIfMissing {
+    [CmdletBinding()]
     param(
         [ValidateSet("Machine", "User")]
         [string]$Scope,
@@ -70,6 +75,7 @@ function Add-PathEntryIfMissing {
 
 # 卸载时按规范化路径从 PATH 移除（与 Add-PathEntryIfMissing 规则一致）
 function Remove-PathEntryIfExists {
+    [CmdletBinding()]
     param(
         [ValidateSet("Machine", "User")]
         [string]$Scope,

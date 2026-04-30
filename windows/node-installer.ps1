@@ -17,6 +17,8 @@ $NodeRegKey = "HKLM:\SOFTWARE\Node.js"
 
 # 安装 Machine 路径与卸载入口需要管理员
 function Test-IsAdmin {
+    [CmdletBinding()]
+    param()
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -24,6 +26,8 @@ function Test-IsAdmin {
 
 # 非管理员：拉起新的提升进程（当前进程退出；勿用 $args 作变量名）
 function Start-ElevatedSelf {
+    [CmdletBinding()]
+    param()
     $elevatedSpawnArgs = @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
