@@ -56,6 +56,12 @@ Git 在 git 安装模式下是必须（`-InstallMethod git`），且默认的 np
 - `pnpm build`
 - 生成 `openclaw.cmd` 包装器并加到 PATH。
 
+## 我们的安装脚本说明
+
+我们在官网安装脚本的基础上，做了自定义的二次开发，既保留了部分功能，又针对国内的小白用户他拓展了一些功能。
+
+### node
+
 ## 关于 `node-installer.ps1` 的安装说明
 
 这个脚本是专门用来安装 node，是为了解决 OpenClaw 内置的 Node 需要翻墙的问题。
