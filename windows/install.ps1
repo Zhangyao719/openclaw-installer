@@ -19,8 +19,8 @@ $ErrorActionPreference = "Stop"
 # 0 前置       — 横幅、PowerShell 执行策略（否则 npm 脚本报错）
 # 1 Node.js    — 1.1 检测版本 ≥22；1.2 缺失则 winget → choco → scoop 安装；1.3 设置 npm registry 镜像
 # 2 Git        — 2.1 检测；2.2 缺失则 winget 安装（git 安装模式为硬性依赖）
-# （以下步骤代码暂注释，解冻步骤 3、4 时启用：）
 # 3 OpenClaw   — 3.1 npm：全局 npm 包；3.2 git：克隆/更新仓库 + pnpm 构建 + 本地 wrapper
+# （以下步骤代码暂注释，解冻步骤 4 时启用：）
 # 4 收尾       — 将 npm global prefix 写入用户 PATH；可选提示 onboard
 # -----------------------------------------------------------------------------
 
@@ -257,7 +257,6 @@ function Ensure-Git {
     return Install-Git
 }
 
-<#
 # --- 通用工具：子进程输出捕获、路径与字符串 ---
 
 # 读取文件并去掉末尾换行，不存在返回空串
@@ -318,12 +317,12 @@ function Invoke-NativeCommandCapture {
         }
 
         $startProcessArgs = @{
-            FilePath = $startFilePath
-            ArgumentList = $startArguments
-            Wait = $true
-            PassThru = $true
+            FilePath               = $startFilePath
+            ArgumentList           = $startArguments
+            Wait                   = $true
+            PassThru               = $true
             RedirectStandardOutput = $stdoutPath
-            RedirectStandardError = $stderrPath
+            RedirectStandardError  = $stderrPath
         }
         if (![string]::IsNullOrWhiteSpace($WorkingDirectory)) {
             $startProcessArgs.WorkingDirectory = $WorkingDirectory
@@ -333,10 +332,11 @@ function Invoke-NativeCommandCapture {
 
         return @{
             ExitCode = $process.ExitCode
-            Stdout = Read-TrimmedFileText -Path $stdoutPath
-            Stderr = Read-TrimmedFileText -Path $stderrPath
+            Stdout   = Read-TrimmedFileText -Path $stdoutPath
+            Stderr   = Read-TrimmedFileText -Path $stderrPath
         }
-    } finally {
+    }
+    finally {
         Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     }
 }
@@ -356,7 +356,7 @@ function Install-OpenClawNpm {
 
     $installSpec = Resolve-PackageInstallSpec -Target $Target
     
-    Write-Host "Installing OpenClaw ($installSpec)..." -Level info
+    Write-Host "全局安装 OpenClaw ($installSpec)..." -Level info
     
     try {
         # Run npm out-of-process so warning chatter on stderr does not get
@@ -375,13 +375,14 @@ function Install-OpenClawNpm {
             Microsoft.PowerShell.Utility\Write-Host $installResult.Stderr
         }
         if ($installResult.ExitCode -ne 0) {
-            Write-Host "npm install failed with exit code $($installResult.ExitCode)" -Level error
+            Write-Host "全局安装 OpenClaw 失败，退出码：$($installResult.ExitCode)。" -Level error
             return $false
         }
-        Write-Host "OpenClaw installed" -Level success
+        Write-Host "OpenClaw 全局安装完成" -Level success
         return $true
-    } catch {
-        Write-Host "npm install failed: $_" -Level error
+    }
+    catch {
+        Write-Host "npm 安装失败: $_" -Level error
         return $false
     }
 }
@@ -390,31 +391,32 @@ function Install-OpenClawNpm {
 function Install-OpenClawGit {
     param([string]$RepoDir, [switch]$Update)
     
-    Write-Host "Installing OpenClaw from git..." -Level info
+    Write-Host "从 git 安装 OpenClaw..." -Level info
     
     # 3.2.1 克隆仓库或（可选）git pull 更新
     if (!(Test-Path $RepoDir)) {
-        Write-Host "  Cloning repository..." -Level info
+        Write-Host "  克隆仓库..." -Level info
         git clone https://github.com/openclaw/openclaw.git $RepoDir 2>&1
-    } elseif ($Update) {
-        Write-Host "  Updating repository..." -Level info
+    }
+    elseif ($Update) {
+        Write-Host "  更新仓库..." -Level info
         git -C $RepoDir pull --rebase 2>&1
     }
     
     # 3.2.2 若无 pnpm 则全局安装
     # Install pnpm if not present
     if (!(Get-Command pnpm -ErrorAction SilentlyContinue)) {
-        Write-Host "  Installing pnpm..." -Level info
+        Write-Host "  全局安装 pnpm..." -Level info
         npm install -g pnpm 2>&1
     }
     
     # 3.2.3 依赖安装与构建
     # Install dependencies
-    Write-Host "  Installing dependencies..." -Level info
+    Write-Host "  安装依赖..." -Level info
     pnpm install --dir $RepoDir 2>&1
     
     # Build
-    Write-Host "  Building..." -Level info
+    Write-Host "  构建..." -Level info
     pnpm --dir $RepoDir build 2>&1
     
     # 3.2.4 生成 openclaw.cmd 包装并把 ~/.local/bin 加入 PATH
@@ -431,7 +433,7 @@ node "$entryPath" %*
 "@ | Out-File -FilePath "$wrapperDir\openclaw.cmd" -Encoding ASCII -Force
     Add-ToPath -Path $wrapperDir
     
-    Write-Host "OpenClaw installed" -Level success
+    Write-Host "OpenClaw 下载并构建完成" -Level success
     return $true
 }
 
@@ -444,8 +446,8 @@ function Test-ExplicitPackageInstallSpec {
     }
 
     return $Target.Contains("://") -or
-        $Target.Contains("#") -or
-        $Target -match '^(file|github|git\+ssh|git\+https|git\+http|git\+file|npm):'
+    $Target.Contains("#") -or
+    $Target -match '^(file|github|git\+ssh|git\+https|git\+http|git\+file|npm):'
 }
 
 # 将 -Tag 转为 npm 可安装的包说明（latest / main / 版本号 / 显式 spec）
@@ -475,7 +477,6 @@ function Add-ToPath {
         Write-Host "Added $Path to user PATH" -Level info
     }
 }
-#>
 
 $script:InstallExitCode = 0
 
@@ -499,14 +500,14 @@ function Complete-Install {
         exit $script:InstallExitCode
     }
 
-    throw "OpenClaw installation failed with exit code $($script:InstallExitCode)."
+    throw "OpenClaw 安装失败，退出码：$($script:InstallExitCode)。"
 }
 
-# Main：当前执行 0→1→2（步骤 3–4 见下方注释块及上方「通用工具」注释块）
+# Main：当前执行 0→1→2→3（步骤 4 见下方注释块）
 function Main {
     Write-Banner
     
-    Write-Host "Windows detected" -Level success
+    Write-Host "检测到 Windows 系统" -Level success
     
     # 0 前置：执行策略（必须在任何 npm 调用之前）
     # Check and handle execution policy FIRST, before any npm calls
@@ -533,7 +534,6 @@ function Main {
             return (Fail-Install)
         }
 
-        <#
         if ($DryRun) {
             Write-Host "[DRY RUN] Would install OpenClaw from git to $GitDir" -Level info
         }
@@ -547,7 +547,6 @@ function Main {
                 return (Fail-Install)
             }
         }
-        #>
     }
     else {
         # npm 方式：建议有 Git（部分依赖可能用到）
@@ -556,12 +555,10 @@ function Main {
             Write-Host "未检测到 Git，npm 安装可能会失败，建议安装 Git 并重新运行安装脚本。" -Level warn
         }
 
-        <#
         if ($DryRun) {
             Write-Host "[DRY RUN] Would install OpenClaw via npm ($((Resolve-PackageInstallSpec -Target $Tag)))" -Level info
-        } else {
-
-            
+        }
+        else {
             $gitWrapper = "$env:USERPROFILE\.local\bin\openclaw.cmd"
             if (Test-Path $gitWrapper) {
                 Remove-Item -Force $gitWrapper
@@ -571,9 +568,7 @@ function Main {
             if (!(Install-OpenClawNpm -Target $Tag)) {
                 return (Fail-Install)
             }
-            
         }
-        #>
     }
 
     <#
@@ -602,7 +597,7 @@ function Main {
     #>
     
     Write-Host ""
-    Write-Host "步骤 0（前置）、1（Node.js）与 2（Git）已完成。" -Level success
+    Write-Host "步骤 0～3 已完成。步骤 4（PATH / onboard）仍为注释，npm 全局命令可能需新开终端。" -Level success
     return $true
 }
 
