@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 # -----------------------------------------------------------------------------
 # 安装流程总览（主入口：Main）
 # 0 前置       — 横幅、PowerShell 执行策略（否则 npm 脚本报错）
-# 1 Node.js    — 1.1 检测版本 ≥22；1.2 缺失则 winget → choco → scoop 安装
+# 1 Node.js    — 1.1 检测版本 ≥22；1.2 缺失则 winget → choco → scoop 安装；1.3 设置 npm registry 镜像
 # （以下步骤代码暂注释，后续启用：）
 # 2 Git        — 2.1 检测；2.2 缺失则 winget 安装（git 安装模式为硬性依赖）
 # 3 OpenClaw   — 3.1 npm：全局 npm 包；3.2 git：克隆/更新仓库 + pnpm 构建 + 本地 wrapper
@@ -47,7 +47,7 @@ function Write-Host {
 # 打印安装器标题横幅
 function Write-Banner {
     Write-Host ""
-    Write-Host "${ACCENT}  🦞 OpenClaw Installer$NC" -Level info
+    Write-Host "${ACCENT}  🦞 OpenClaw 小龙虾安装神器——猫鼬 AI 出品$NC" -Level info
     Write-Host "${MUTED}  All your chats, one OpenClaw.$NC" -Level info
     Write-Host ""
 }
@@ -72,22 +72,22 @@ function Test-Admin {
 function Ensure-ExecutionPolicy {
     $status = Get-ExecutionPolicyStatus
     if ($status.Blocked) {
-        Write-Host "PowerShell execution policy is set to: $($status.Policy)" -Level warn
-        Write-Host "This prevents scripts like npm.ps1 from running." -Level warn
+        Write-Host "PowerShell 当前执行策略为: $($status.Policy)" -Level warn
+        Write-Host "这会阻止 npm.ps1 等脚本运行。" -Level warn
         Write-Host ""
         
         # Try to set execution policy for current process
         try {
             Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -ErrorAction Stop
-            Write-Host "Set execution policy to RemoteSigned for current process" -Level success
+            Write-Host "已将当前进程的执行策略设置为 RemoteSigned" -Level success
             return $true
         } catch {
-            Write-Host "Could not automatically set execution policy" -Level error
+            Write-Host "无法自动设置执行策略" -Level error
             Write-Host ""
-            Write-Host "To fix this, run:" -Level info
+            Write-Host "要解决这个问题，请运行:" -Level info
             Write-Host "  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process" -Level info
             Write-Host ""
-            Write-Host "Or run PowerShell as Administrator and execute:" -Level info
+            Write-Host "或者以管理员身份运行 PowerShell 并执行:" -Level info
             Write-Host "  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine" -Level info
             return $false
         }
@@ -119,71 +119,91 @@ function Get-NpmVersion {
     return $null
 }
 
-# 1.2 安装 Node：依次尝试 winget(OpenJS.NodeJS.LTS) → choco → scoop，成功后刷新 PATH
-function Install-Node {
-    Write-Host "Node.js not found" -Level info
-    Write-Host "Installing Node.js..." -Level info
-    
-    # 1.2.1 优先 winget（OpenJS.NodeJS.LTS）
-    # Try winget first
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-        Write-Host "  Using winget..." -Level info
-        try {
-            winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
-            # Refresh PATH
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-            Write-Host "  Node.js installed via winget" -Level success
-            return $true
-        } catch {
-            Write-Host "  Winget install failed: $_" -Level warn
-        }
-    }
-    
-    # 1.2.2 其次 Chocolatey（nodejs-lts）
-    # Try chocolatey
-    if (Get-Command choco -ErrorAction SilentlyContinue) {
-        Write-Host "  Using chocolatey..." -Level info
-        try {
-            choco install nodejs-lts -y 2>&1 | Out-Null
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-            Write-Host "  Node.js installed via chocolatey" -Level success
-            return $true
-        } catch {
-            Write-Host "  Chocolatey install failed: $_" -Level warn
-        }
-    }
-    
-    # 1.2.3 再次 Scoop（nodejs-lts）
-    # Try scoop
-    if (Get-Command scoop -ErrorAction SilentlyContinue) {
-        Write-Host "  Using scoop..." -Level info
-        try {
-            scoop install nodejs-lts 2>&1 | Out-Null
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-            Write-Host "  Node.js installed via scoop" -Level success
-            return $true
-        } catch {
-            Write-Host "  Scoop install failed: $_" -Level warn
-        }
-    }
-    
-    Write-Host "Could not install Node.js automatically" -Level error
-    Write-Host "Please install Node.js 22+ manually from: https://nodejs.org" -Level info
-    return $false
-}
-
 # 1.1 Node 环境检测：需主版本 ≥22；不满足则调用 Install-Node
 function Ensure-Node {
     $nodeVersion = Get-NodeVersion
     if ($nodeVersion) {
         $major = [int]($nodeVersion -split '\.')[0]
         if ($major -ge 22) {
-            Write-Host "Node.js v$nodeVersion found" -Level success
+            Write-Host "Node.js v$nodeVersion 已安装" -Level success
             return $true
         }
-        Write-Host "Node.js v$nodeVersion found, but need v22+" -Level warn
+        Write-Host "Node.js v$nodeVersion 已安装，但需要 v22+ 版本" -Level warn
     }
     return Install-Node
+}
+
+# 1.2 安装 Node：依次尝试 winget(OpenJS.NodeJS.LTS) → choco → scoop，成功后刷新 PATH
+function Install-Node {
+    Write-Host "Node.js 未安装" -Level info
+    Write-Host "正在安装 Node.js..." -Level info
+    
+    # 1.2.1 优先 winget（OpenJS.NodeJS.LTS）
+    # Try winget first
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "  使用 winget 安装 Node.js..." -Level info
+        try {
+            winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
+            # Refresh PATH
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            Write-Host "   winget 安装 Node.js 成功" -Level success
+            return $true
+        } catch {
+            Write-Host "  Winget 安装失败: $_" -Level warn
+        }
+    }
+    
+    # 1.2.2 其次 Chocolatey（nodejs-lts）
+    # Try chocolatey
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        Write-Host "  使用 Chocolatey 安装 Node.js..." -Level info
+        try {
+            choco install nodejs-lts -y 2>&1 | Out-Null
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            Write-Host "   Chocolatey 安装 Node.js 成功" -Level success
+            return $true
+        } catch {
+            Write-Host "   Chocolatey 安装 Node.js 失败: $_" -Level warn
+        }
+    }
+    
+    # 1.2.3 再次 Scoop（nodejs-lts）
+    # Try scoop
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        Write-Host "  使用 Scoop 安装 Node.js..." -Level info
+        try {
+            scoop install nodejs-lts 2>&1 | Out-Null
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            Write-Host "   Scoop 安装 Node.js 成功" -Level success
+            return $true
+        } catch {
+            Write-Host "   Scoop 安装 Node.js 失败: $_" -Level warn
+        }
+    }
+    
+    Write-Host "无法自动安装 Node.js" -Level error
+    Write-Host "请手动从 https://nodejs.org/zh-cn/download 安装 Node.js 22+ 版本" -Level info
+    return $false
+}
+
+$script:NpmRegistryMirrorUrl = "https://registry.npmmirror.com"
+
+# 1.3 Node/npm 就绪后，将默认 registry 设为国内镜像（失败仅告警，不中断安装）
+function Set-NpmRegistryMirror {
+    param([string]$RegistryUrl = $script:NpmRegistryMirrorUrl)
+
+    if ($DryRun) {
+        Write-Host "[DRY RUN] Would set npm registry to $RegistryUrl" -Level info
+        return
+    }
+
+    Write-Host "设置 npm 下载源为 $RegistryUrl..." -Level info
+    $p = Start-Process -FilePath "npm.cmd" -ArgumentList @("config", "set", "registry", $RegistryUrl) -NoNewWindow -Wait -PassThru
+    if ($p.ExitCode -ne 0) {
+        Write-Host "无法设置 npm 下载源 (exit $($p.ExitCode))" -Level warn
+        return
+    }
+    Write-Host "npm 下载源设置成功" -Level success
 }
 
 <#
@@ -492,6 +512,9 @@ function Main {
     if (!(Ensure-Node)) {
         return (Fail-Install)
     }
+
+    # 1.3 设置 npm registry 镜像
+    Set-NpmRegistryMirror
     
     <#
     # 2 / 3：按 InstallMethod 分支

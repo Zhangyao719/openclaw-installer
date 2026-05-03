@@ -60,38 +60,9 @@ Git 在 git 安装模式下是必须（`-InstallMethod git`），且默认的 np
 
 我们在官网安装脚本的基础上，做了自定义的二次开发，既保留了部分功能，又针对国内的小白用户他拓展了一些功能。
 
-### node
+### 🚀 新增功能
 
-## 关于 `node-installer.ps1` 的安装说明
+- 设置 `npm` 下载源为淘宝镜像。
 
-这个脚本是专门用来安装 node，是为了解决 OpenClaw 内置的 Node 需要翻墙的问题。
-
-### 安装原理
-
-我们基于官方 [Node](https://github.com/nodejs/node) 的 MSI 安装原理，实现了 ps1 版本的 Node 安装脚本。
-
-安装流程大致如下：
-
-1. 确保安装权限正确
-   把安装统一为机器级安装，要求管理员权限；如果当前不是管理员，就引导到管理员上下文继续安装。
-2. 获取官方指定版本安装包
-   从淘宝镜像地址下载 Node `v24.15.0` 的 Windows x64 zip，作为唯一安装来源，避免版本漂移。
-3. 把 Node 落地到标准系统目录
-   将包内容部署到 `C:\Program Files\nodejs`，形成与传统 Windows 安装一致的主安装位置（`node.exe`、npm/npx、node_modules 等都在这里）。
-4. 固化“安装器能力”到本机
-   把安装/卸载脚本副本放到 `C:\Program Files\nodejs\installer`，让后续卸载不依赖项目仓库或外部路径。
-5. 注册系统安装信息
-   写入 Windows 卸载信息（显示名 `Node.js`、版本 `24.15.0`、卸载入口等）以及 Node 安装信息（安装路径/版本），让系统和其他工具能识别这是一个已安装的软件。
-6. 配置命令可用性并立即生效
-   更新系统 PATH（Node 主目录）和用户 PATH（`%AppData%\npm`），然后广播环境变量变更，让新开的终端可以直接使用 `node` / `npm`。
-
-## 关于 `openclaw-installer.ps1` 的安装说明
-
-我们的安装脚本采用：自研预装必备环境(node/git) + 执行 `OpenClaw install.ps1`（或者直接使用 npm 安装？） + 自研安装配置（吸取 onboard 配置实现）+ 自研 gateway 启动的策略。
-
-### 安装流程
-
-1. 
-
-2. 先检测有没有安装过 Node，如果没有，则使用 `node-installer`，解决国内安装慢的问题，如果之前安装过，则使用 openclaw 的官方脚本逻辑
+  新增 `Set-NpmRegistryMirror` 函数，设置淘宝镜像。
 
