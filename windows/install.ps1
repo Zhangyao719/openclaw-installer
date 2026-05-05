@@ -937,7 +937,13 @@ function Main {
         } else {
             Write-Host "Starting setup..." -ForegroundColor Cyan
             Write-Host ""
-            Invoke-OpenClawCommand onboard
+            Invoke-OpenClawCommand onboard `
+                --accept-risk `
+                --flow quickstart `
+                --skip-channels `
+                --skip-skills `
+                --skip-search `
+                --skip-ui
         }
     }
 

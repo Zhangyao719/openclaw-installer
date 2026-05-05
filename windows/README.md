@@ -81,15 +81,13 @@
   ```bash
   openclaw onboard --accept-risk \
     --flow quickstart \
-    --gateway-auth token \
-    --install-daemon \
     --skip-channels \
     --skip-skills \
     --skip-search \
     --skip-ui \
     --json \
   ```
-
+  
 - 单独进行 Skills 配置。
 
   安装 `SkillHub` ，再预装 Skills。
