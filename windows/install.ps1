@@ -9,6 +9,7 @@ param(
     [string]$GitDir = "$env:USERPROFILE\openclaw",
     [switch]$NoOnboard,
     [switch]$NoSkills,
+    [switch]$NoDashboard,
     [switch]$NoGitUpdate,
     [switch]$DryRun
 )
@@ -43,6 +44,7 @@ $script:SkillHubKitTarUrl = 'https://skillhub-1388575217.cos.ap-guangzhou.myqclo
 # 5 onboard    — 5.1 事前说明；5.2 执行 `openclaw onboard … --json`；5.3 解析 JSON 中 ok 为 true 则算成功
 #                 -NoOnboard 时整步跳过；-DryRun 不执行、仅 [DRY RUN] 提示
 # 6 SkillHub   — 6.1 官方安装包（tar）+ bash 执行 cli/install.sh；6.2 按内嵌列表 skillhub install；-NoSkills 整步跳过；-DryRun 仅提示
+# 7 Dashboard  — 启动 `openclaw dashboard`，从输出解析带 `#token=` 的 Dashboard URL，弹窗后默认浏览器打开；-NoDashboard 跳过；-DryRun 仅提示
 # -----------------------------------------------------------------------------
 
 # Colors
@@ -719,6 +721,106 @@ function Install-SkillHub {
     Write-Host "SkillHub 预装结束：成功 $ok 个；失败 $($failedSkills.Count) 个。" -Level $(if ($failedSkills.Count -eq 0) { 'success' } else { 'warn' })
 }
 
+# --- 7. Dashboard（openclaw dashboard 长期驻留；异步读 stdout/stderr 捕获第一行 Dashboard URL）---
+
+function Test-DashboardUrlLine {
+    param([string]$Line)
+
+    if ([string]::IsNullOrWhiteSpace($Line)) {
+        return $null
+    }
+    $clean = $Line -replace '\x1b\[[0-9;]*m', ''
+    if ($clean -match '(?i)Dashboard URL:\s*(https?://\S+)') {
+        $u = $Matches[1].Trim()
+        if ($u -match '(?i)#token=') {
+            return $u
+        }
+    }
+    return $null
+}
+
+function Invoke-OpenClawDashboardBrowser {
+    if ($NoDashboard) {
+        return
+    }
+
+    if ($DryRun) {
+        Write-Host "[DRY RUN] 将启动 openclaw dashboard，解析 Dashboard URL 后弹窗并打开浏览器。" -Level info
+        return
+    }
+
+    Refresh-SessionPathFromRegistry
+    $exe = Resolve-OpenClawExecutablePath
+    if (!$exe) {
+        Write-Host "未找到 openclaw，无法启动 Dashboard。" -Level warn
+        return
+    }
+
+    Write-Host "正在启动 OpenClaw Dashboard（后台进程）…" -Level info
+
+    $script:DashboardUrlCaptured = $null
+    $dataHandler = [System.Diagnostics.DataReceivedEventHandler]{
+        param($sender, [System.Diagnostics.DataReceivedEventArgs]$e)
+        if ($e.Data) {
+            $u = Test-DashboardUrlLine -Line $e.Data
+            if ($u) {
+                $script:DashboardUrlCaptured = $u
+            }
+        }
+    }
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $exe
+    $psi.Arguments = 'dashboard'
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+    $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    $proc.EnableRaisingEvents = $true
+    $proc.OutputDataReceived += $dataHandler
+    $proc.ErrorDataReceived += $dataHandler
+
+    [void]$proc.Start()
+    $proc.BeginOutputReadLine()
+    $proc.BeginErrorReadLine()
+
+    $deadline = (Get-Date).AddSeconds(120)
+    while ((Get-Date) -lt $deadline) {
+        if (-not [string]::IsNullOrWhiteSpace($script:DashboardUrlCaptured)) {
+            break
+        }
+        if ($proc.HasExited) {
+            break
+        }
+        Start-Sleep -Milliseconds 250
+    }
+
+    if ([string]::IsNullOrWhiteSpace($script:DashboardUrlCaptured)) {
+        Write-Host "未能及时解析 Dashboard URL（请确认 gateway 已就绪）。" -Level warn
+        if (!$proc.HasExited) {
+            $proc.Kill()
+        }
+        return
+    }
+
+    $dashUrl = $script:DashboardUrlCaptured
+
+    Add-Type -AssemblyName System.Windows.Forms
+    [void][System.Windows.Forms.MessageBox]::Show(
+        "小龙虾已经启动，地址为：`n$dashUrl`n`n点击「确定」后在浏览器中打开该地址。",
+        'OpenClaw Dashboard',
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Information
+    )
+
+    Start-Process -FilePath $dashUrl
+}
+
 $script:InstallExitCode = 0
 
 # 记录失败退出码（供 Complete-Install / 被 dot-source 时处理）
@@ -857,10 +959,17 @@ function Main {
     return $true
 }
 
-# 脚本入口：执行 Main；Complete-Install 仅反映 Main；SkillHub 在成功后追加（失败不影响退出码）
+# 脚本入口：执行 Main；Complete-Install 仅反映 Main
 $mainResults = @(Main)
 $installSucceeded = $mainResults.Count -gt 0 -and $mainResults[-1] -eq $true
 Complete-Install -Succeeded:$installSucceeded
+
+# SkillHub 与 Skills 预装
 if ($installSucceeded -and !$NoSkills) {
     Install-SkillHub
+}
+
+# Dashboard 启动，浏览器打开解析带 token 的 URL
+if ($installSucceeded -and !$NoDashboard) {
+    Invoke-OpenClawDashboardBrowser
 }

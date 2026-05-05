@@ -92,6 +92,8 @@ Git 在 git 安装模式下是必须（`-InstallMethod git`），且默认的 np
 
   todo
 
+- 自动打开浏览器
+
 ### 🚀 安装流程
 
 1. 环境检测（与官方保持一致）
@@ -102,4 +104,5 @@ Git 在 git 安装模式下是必须（`-InstallMethod git`），且默认的 np
 6. 进行 `onboard` 引导配置
 7. 进行 Skills 配置
 8. 进行 md 模板配置
+9. 通过 `dashboard` 获取 token URL，并自动打开浏览器
 
