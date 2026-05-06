@@ -2,7 +2,12 @@ Windows 版本的脚本使用说明
 
 ## OpenClaw 官方安装脚本解析
 
-下文对应仓库中的示例脚本 [`openclaw/install.ps1`](./openclaw/install.ps1)（与官网 one-liner 下载的安装逻辑对齐的代表实现）。
+OpenClaw 官方有两种 `install.ps1` 脚本，分别为：
+
+1. https://github.com/openclaw/openclaw/blob/main/scripts/install.ps1
+2. https://openclaw.ai/install.ps1
+
+其中第二个是面向用户的版本（我们安装 OpenClaw 时用的），以下是针对第二个版本做的分析。
 
 ### 1. OpenClaw install 功能模块划分
 
@@ -70,15 +75,20 @@ Windows 版本的脚本使用说明
 
 我们在官网安装脚本的基础上，做了自定义的二次开发，既保留了部分功能，又针对国内的小白用户拓展了一些功能。
 
+我们提供两种脚本，一种是面向用户使用的 `install-user.ps1`，一种是面向开发者的 `install-script.ps1`，前者有交互引导页面，对新用户更有好，后者则更倾向直接部署运行，更方便。
+
 ### 🌈 新增功能
 
 - 设置 `npm` 下载源为淘宝镜像。
 
   新增 `Set-NpmRegistryMirror` 函数，设置淘宝镜像。
 
-- 主动调用 `onboard` 进行基础配置。
+  对于 `install-user.ps1` ，如果 node 安装失败，会有 node 安装教程提示。
+
+- 调用 `onboard` 的同时，传递部分参数，简化交互步骤。
 
   ```bash
+  # install-user.ps1 会执行以下向导命令
   openclaw onboard --accept-risk \
     --flow quickstart \
     --skip-channels \
@@ -88,9 +98,9 @@ Windows 版本的脚本使用说明
     --json \
   ```
   
-- 单独进行 Skills 配置。
-
-  预先安装部分常用 Skills
+  对于 `install-script.ps1`，还会额外传入 `--non-interactive`参数，已达到静默安装的效果（非交互向导）。
+  
+- 预先安装部分常用 Skills
 
   ```tex
   'self-improving-agent',
@@ -106,12 +116,14 @@ Windows 版本的脚本使用说明
   'skill-vetter',
   'summarize'
   ```
-
+  
 - 单独进行 md 模板配置
 
   todo
 
-- 自动打开浏览器
+- 执行 `dashboard` 自动打开浏览器
+
+  `install-script.ps1`只执行，不打开浏览器
 
 ### 🚀 安装流程
 
@@ -135,3 +147,40 @@ Windows 版本的脚本使用说明
 ```
 
 #### 参数
+
+## FAQ
+
+### 为什么脚本不能直接进行 `onboard` 交互向导，要人工输入才可以？
+
+根本原因是 stdin 的 TTY 状态不同，导致 `openclaw onboard` 的内部行为分叉。
+
+人为在终端手动输入 `openclaw board` 时，Node.js 检测到完整的交互式 TTY，openclaw 进入 TUI 模式，渲染界面、等待用户操作，一切正常。
+
+```tex
+你的 shell → openclaw.cmd → node → openclaw onboard
+                                        ↑
+                    process.stdin.isTTY  = true
+                    process.stdout.isTTY = true
+```
+
+从 PowerShell 脚本调用 `& openclaw.cmd @Arguments`。
+
+```te
+pwsh -File install.ps1
+  └─ & openclaw.cmd @args
+       └─ cmd.exe (Volta shim)
+            └─ node → openclaw onboard
+                           ↑
+           process.stdin.isTTY  = true  ← PowerShell 没有重定向 stdin
+           process.stdout.isTTY = false ← PowerShell 接管了 stdout 管道
+```
+
+关键差异：stdout 不再是 TTY，但 stdin 仍然是 TTY。这个"半 TTY"状态导致 openclaw 内部进入一种矛盾的模式：
+
+- 认为有人在键盘前（`stdin.isTTY = true`）→ 进入"需要等待用户操作"的交互分支
+- 但无法渲染 TUI（`stdout.isTTY = false`）→ 界面什么都不显示
+- 加上 gateway 未运行（`ECONNREFUSED`），交互分支默认行为是无限等待 gateway 或等待用户输入
+
+结果：界面空白、进程挂起。
+
+脚本内的 `onboard` 传入了 `--non-interactive` 参数，明确告诉 openclaw：不要依赖 stdin 的 TTY 状态，直接走非交互流程，有错误就输出并以非零码退出，而不是等待。

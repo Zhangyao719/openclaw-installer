@@ -14,7 +14,7 @@
 # 4 安装本体   — 4.1 npm 包说明；4.2 npm 全局安装；4.3 Git 源码克隆构建；4.4.1/4.4.2 遗留子模块目录解析与删除
 # 5 装后       — 5.1 doctor 迁移；5.2 网关服务刷新；5.3 预装 Skills（全新安装）
 # 6 Main       — 总控与 onboard
-# 7 Dashboard  — 获取并打开链接
+# 7 Dashboard
 
 param(
     [string]$Tag = "latest",
@@ -58,7 +58,14 @@ function Complete-Install {
 }
 
 Write-Host ""
-Write-Host "  🦞 OpenClaw 安装神器 —— 猫鼬AI出品" -ForegroundColor Cyan
+Write-Host "  ╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "  ║                                                           ║" -ForegroundColor Cyan
+Write-Host "  ║          🦞  OpenClaw Easy Deploy  🦞                    ║" -ForegroundColor Cyan
+Write-Host "  ║                                                           ║" -ForegroundColor Cyan
+Write-Host "  ║     让 OpenClaw 部署变得简单 - 零技术门槛，一键安装        ║" -ForegroundColor Cyan
+Write-Host "  ║                                                           ║" -ForegroundColor Cyan
+Write-Host "  ║                    猫鼬AI出品                             ║" -ForegroundColor Cyan
+Write-Host "  ╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if running in PowerShell
@@ -114,12 +121,14 @@ function Check-Node {
             if ($version -ge 22) {
                 Write-Host "[OK] Node.js $nodeVersion found" -ForegroundColor Green
                 return $true
-            } else {
+            }
+            else {
                 Write-Host "[!] Node.js $nodeVersion found, but v22+ required" -ForegroundColor Yellow
                 return $false
             }
         }
-    } catch {
+    }
+    catch {
         Write-Host "[!] Node.js not found" -ForegroundColor Yellow
         return $false
     }
@@ -136,7 +145,7 @@ function Install-Node {
         winget install OpenJS.NodeJS.LTS --source winget --accept-package-agreements --accept-source-agreements
 
         # Refresh PATH
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
         if (Check-Node) {
             Write-Host "[OK] Node.js installed via winget" -ForegroundColor Green
             return $true
@@ -152,7 +161,7 @@ function Install-Node {
         choco install nodejs-lts -y
 
         # Refresh PATH
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
         Write-Host "[OK] Node.js installed via Chocolatey" -ForegroundColor Green
         return $true
     }
@@ -183,7 +192,8 @@ function Set-NpmRegistry {
     try {
         & (Get-NpmCommandPath) config set registry $registry
         Write-Host "[OK] npm registry set to $registry" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "[!] Failed to set npm registry: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
@@ -210,7 +220,8 @@ function Check-Git {
     try {
         $null = Get-Command git -ErrorAction Stop
         return $true
-    } catch {
+    }
+    catch {
         return $false
     }
 }
@@ -244,11 +255,11 @@ function Get-PortableGitRoot {
 function Get-PortableGitCommandPath {
     $root = Get-PortableGitRoot
     foreach ($candidate in @(
-        (Join-Path $root "mingw64\bin\git.exe"),
-        (Join-Path $root "cmd\git.exe"),
-        (Join-Path $root "bin\git.exe"),
-        (Join-Path $root "git.exe")
-    )) {
+            (Join-Path $root "mingw64\bin\git.exe"),
+            (Join-Path $root "cmd\git.exe"),
+            (Join-Path $root "bin\git.exe"),
+            (Join-Path $root "git.exe")
+        )) {
         if (Test-Path $candidate) {
             return $candidate
         }
@@ -265,10 +276,10 @@ function Use-PortableGitIfPresent {
 
     $portableRoot = Get-PortableGitRoot
     foreach ($pathEntry in @(
-        (Join-Path $portableRoot "mingw64\bin"),
-        (Join-Path $portableRoot "usr\bin"),
-        (Split-Path -Parent $gitExe)
-    )) {
+            (Join-Path $portableRoot "mingw64\bin"),
+            (Join-Path $portableRoot "usr\bin"),
+            (Split-Path -Parent $gitExe)
+        )) {
         if (Test-Path $pathEntry) {
             Add-ToProcessPath $pathEntry
         }
@@ -284,7 +295,7 @@ function Resolve-PortableGitDownload {
     $releaseApi = "https://api.github.com/repos/git-for-windows/git/releases/latest"
     $headers = @{
         "User-Agent" = "openclaw-installer"
-        "Accept" = "application/vnd.github+json"
+        "Accept"     = "application/vnd.github+json"
     }
     $release = Invoke-RestMethod -Uri $releaseApi -Headers $headers
     if (-not $release -or -not $release.assets) {
@@ -292,17 +303,17 @@ function Resolve-PortableGitDownload {
     }
 
     $asset = $release.assets |
-        Where-Object { $_.name -match '^MinGit-.*-64-bit\.zip$' -and $_.name -notmatch 'busybox' } |
-        Select-Object -First 1
+    Where-Object { $_.name -match '^MinGit-.*-64-bit\.zip$' -and $_.name -notmatch 'busybox' } |
+    Select-Object -First 1
 
     if (-not $asset) {
         throw "Could not find a MinGit zip asset in the latest git-for-windows release."
     }
 
     return @{
-        Tag = $release.tag_name
+        Tag  = $release.tag_name
         Name = $asset.name
-        Url = $asset.browser_download_url
+        Url  = $asset.browser_download_url
     }
 }
 
@@ -338,7 +349,8 @@ function Install-PortableGit {
         Invoke-WebRequest -Uri $download.Url -OutFile $tmpZip
         Expand-Archive -Path $tmpZip -DestinationPath $tmpExtract -Force
         Move-Item -Path (Join-Path $tmpExtract "*") -Destination $portableRoot -Force
-    } finally {
+    }
+    finally {
         if (Test-Path $tmpZip) {
             Remove-Item -Force $tmpZip
         }
@@ -364,7 +376,8 @@ function Ensure-Git {
         if (Check-Git) {
             return $true
         }
-    } catch {
+    }
+    catch {
         Write-Host "[!] Portable Git bootstrap failed: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 
@@ -473,7 +486,8 @@ function Ensure-OpenClawOnPath {
     $npmPrefix = $null
     try {
         $npmPrefix = (& (Get-NpmCommandPath) config get prefix 2>$null).Trim()
-    } catch {
+    }
+    catch {
         $npmPrefix = $null
     }
 
@@ -486,7 +500,7 @@ function Ensure-OpenClawOnPath {
         $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
         if (-not ($userPath -split ";" | Where-Object { $_ -ieq $npmBin })) {
             [Environment]::SetEnvironmentVariable("Path", "$userPath;$npmBin", "User")
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
             Write-Host "[!] Added $npmBin to user PATH (restart terminal if command not found)" -ForegroundColor Yellow
         }
         return $true
@@ -499,7 +513,8 @@ function Ensure-OpenClawOnPath {
         foreach ($npmBin in $npmBins) {
             Write-Host "  $npmBin" -ForegroundColor Cyan
         }
-    } else {
+    }
+    else {
         Write-Host "Hint: run \"npm config get prefix\" to find your npm global path." -ForegroundColor Gray
     }
     return $false
@@ -519,7 +534,8 @@ function Ensure-Pnpm {
                 Write-Host "[OK] pnpm installed via corepack" -ForegroundColor Green
                 return
             }
-        } catch {
+        }
+        catch {
             # fallthrough to npm install
         }
     }
@@ -528,7 +544,8 @@ function Ensure-Pnpm {
     $env:NPM_CONFIG_SCRIPT_SHELL = "cmd.exe"
     try {
         & (Get-NpmCommandPath) install -g pnpm
-    } finally {
+    }
+    finally {
         $env:NPM_CONFIG_SCRIPT_SHELL = $prevScriptShell
     }
     Write-Host "[OK] pnpm installed" -ForegroundColor Green
@@ -600,14 +617,16 @@ function Install-OpenClaw {
                 Write-Host "Error: git is missing from PATH." -ForegroundColor Red
                 Write-Host "Install Git for Windows, then reopen PowerShell and retry:" -ForegroundColor Yellow
                 Write-Host "  https://git-scm.com/download/win" -ForegroundColor Cyan
-            } else {
+            }
+            else {
                 Write-Host "Re-run with verbose output to see the full error:" -ForegroundColor Yellow
                 Write-Host '  powershell -c "iex ((irm https://openclaw.ai/install.ps1).TrimStart([char]0xFEFF))"' -ForegroundColor Cyan
             }
             $npmOutput | ForEach-Object { Write-Host $_ }
             return $false
         }
-    } finally {
+    }
+    finally {
         $env:NPM_CONFIG_LOGLEVEL = $prevLogLevel
         $env:NPM_CONFIG_UPDATE_NOTIFIER = $prevUpdateNotifier
         $env:NPM_CONFIG_FUND = $prevFund
@@ -640,10 +659,12 @@ function Install-OpenClawFromGit {
     if (-not $SkipUpdate) {
         if (-not (git -C $RepoDir status --porcelain 2>$null)) {
             git -C $RepoDir pull --rebase 2>$null
-        } else {
+        }
+        else {
             Write-Host "[!] Repo is dirty; skipping git pull" -ForegroundColor Yellow
         }
-    } else {
+    }
+    else {
         Write-Host "[!] Git update disabled; skipping git pull" -ForegroundColor Yellow
     }
 
@@ -661,7 +682,8 @@ function Install-OpenClawFromGit {
             Write-Host "[!] UI build failed; continuing (CLI may still work)" -ForegroundColor Yellow
         }
         & $pnpmCommand -C $RepoDir build
-    } finally {
+    }
+    finally {
         $env:NPM_CONFIG_SCRIPT_SHELL = $prevPnpmScriptShell
     }
 
@@ -676,7 +698,7 @@ function Install-OpenClawFromGit {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if (-not ($userPath -split ";" | Where-Object { $_ -ieq $binDir })) {
         [Environment]::SetEnvironmentVariable("Path", "$userPath;$binDir", "User")
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
         Write-Host "[!] Added $binDir to user PATH (restart terminal if command not found)" -ForegroundColor Yellow
     }
 
@@ -718,7 +740,8 @@ function Run-Doctor {
     Write-Host "[*] Running doctor to migrate settings..." -ForegroundColor Yellow
     try {
         Invoke-OpenClawCommand doctor --non-interactive
-    } catch {
+    }
+    catch {
         # Ignore errors from doctor
     }
     Write-Host "[OK] Migration complete" -ForegroundColor Green
@@ -735,7 +758,8 @@ function Test-GatewayServiceLoaded {
         if ($parsed -and $parsed.service -and $parsed.service.loaded) {
             return $true
         }
-    } catch {
+    }
+    catch {
         return $false
     }
     return $false
@@ -753,7 +777,8 @@ function Refresh-GatewayServiceIfLoaded {
     Write-Host "[*] Refreshing loaded gateway service..." -ForegroundColor Yellow
     try {
         Invoke-OpenClawCommand gateway install --force | Out-Null
-    } catch {
+    }
+    catch {
         Write-Host "[!] Gateway service refresh failed; continuing." -ForegroundColor Yellow
         return
     }
@@ -762,8 +787,44 @@ function Refresh-GatewayServiceIfLoaded {
         Invoke-OpenClawCommand gateway restart | Out-Null
         Invoke-OpenClawCommand gateway status --json | Out-Null
         Write-Host "[OK] Gateway service refreshed" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "[!] Gateway service restart failed; continuing." -ForegroundColor Yellow
+    }
+}
+
+# 用 `openclaw health --json` 检测网关是否健康运行：
+#   - 命令退出码非零 → 不健康
+#   - JSON 中 ok 字段为 false → 不健康
+function Test-GatewayHealthy {
+    $commandPath = Get-OpenClawCommandPath
+    if (-not $commandPath) {
+        return $false
+    }
+
+    $ErrorActionPreference = "Continue"
+    $output = & $commandPath health --json 2>$null
+    $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+
+    if ($exitCode -ne 0) {
+        return $false
+    }
+
+    $text = ($output | ForEach-Object { "$_" }) -join "`n"
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $false
+    }
+
+    try {
+        $json = $text | ConvertFrom-Json
+        if ($json.PSObject.Properties.Name -contains "ok") {
+            return ($json.ok -eq $true)
+        }
+        return $true
+    }
+    catch {
+        return $false
     }
 }
 
@@ -799,7 +860,8 @@ function Install-Skills {
                 Write-Host "[!] Failed to install skill '$slug' (exit code $LASTEXITCODE)" -ForegroundColor Yellow
                 $failed += $slug
             }
-        } catch {
+        }
+        catch {
             Write-Host "[!] Failed to install skill '$slug': $($_.Exception.Message)" -ForegroundColor Yellow
             $failed += $slug
         }
@@ -807,7 +869,8 @@ function Install-Skills {
 
     if ($failed.Count -eq 0) {
         Write-Host "[OK] All $($skills.Count) skills installed" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "[!] $($skills.Count - $failed.Count)/$($skills.Count) skills installed; failed: $($failed -join ', ')" -ForegroundColor Yellow
     }
 }
@@ -830,7 +893,8 @@ function Main {
             Write-Host "[OK] Git dir: $GitDir" -ForegroundColor Green
             if ($NoGitUpdate) {
                 Write-Host "[OK] Git update: disabled" -ForegroundColor Green
-            } else {
+            }
+            else {
                 Write-Host "[OK] Git update: enabled" -ForegroundColor Green
             }
         }
@@ -865,7 +929,7 @@ function Main {
 
     $finalGitDir = $null
 
-    # Step 2: OpenClaw
+    # Step 2: 安装 OpenClaw
     if ($InstallMethod -eq "git") {
         try {
             $npmCommand = Get-NpmCommandPath
@@ -873,12 +937,14 @@ function Main {
                 & $npmCommand uninstall -g openclaw 2>$null | Out-Null
                 Write-Host "[OK] Removed npm global install if present" -ForegroundColor Green
             }
-        } catch { }
+        }
+        catch { }
         $finalGitDir = $GitDir
         if (-not (Install-OpenClawFromGit -RepoDir $GitDir -SkipUpdate:$NoGitUpdate)) {
             return (Fail-Install)
         }
-    } else {
+    }
+    else {
         $gitWrapper = Join-Path (Join-Path $env:USERPROFILE ".local\\bin") "openclaw.cmd"
         if (Test-Path $gitWrapper) {
             Remove-Item -Force $gitWrapper
@@ -905,7 +971,8 @@ function Main {
     $installedVersion = $null
     try {
         $installedVersion = (Invoke-OpenClawCommand --version 2>$null).Trim()
-    } catch {
+    }
+    catch {
         $installedVersion = $null
     }
     if (-not $installedVersion) {
@@ -914,7 +981,8 @@ function Main {
             if ($npmList -and $npmList.dependencies -and $npmList.dependencies.openclaw -and $npmList.dependencies.openclaw.version) {
                 $installedVersion = $npmList.dependencies.openclaw.version
             }
-        } catch {
+        }
+        catch {
             $installedVersion = $null
         }
     }
@@ -922,7 +990,8 @@ function Main {
     Write-Host ""
     if ($installedVersion) {
         Write-Host "OpenClaw 安装成功 ($installedVersion)!" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "OpenClaw 安装成功!" -ForegroundColor Green
     }
     Write-Host ""
@@ -951,7 +1020,8 @@ function Main {
         )
         Write-Host (Get-Random -InputObject $updateMessages) -ForegroundColor Gray
         Write-Host ""
-    } else {
+    }
+    else {
         $completionMessages = @(
             "Ahh nice, I like it here. Got any snacks? ",
             "Home sweet home. Don't worry, I won't rearrange the furniture.",
@@ -979,22 +1049,26 @@ function Main {
         Write-Host "Upgrade complete. Run " -NoNewline
         Write-Host "openclaw doctor" -ForegroundColor Cyan -NoNewline
         Write-Host " to check for additional migrations."
-    } else {
+    }
+    else {
         if ($NoOnboard) {
             Write-Host "Skipping onboard (requested). Run " -NoNewline
             Write-Host "openclaw onboard" -ForegroundColor Cyan -NoNewline
             Write-Host " later."
-        } else {
+        }
+        else {
             Write-Host "Starting setup..." -ForegroundColor Cyan
             Write-Host ""
-            Invoke-OpenClawCommand onboard --accept-risk --flow quickstart --skip-channels --skip-skills --skip-search --skip-ui
+            Invoke-OpenClawCommand onboard --non-interactive --accept-risk --flow quickstart --skip-channels --skip-skills --skip-search --skip-ui
         }
     }
 
-    # Step 8: 安装预设 Skills（全新安装时执行，与 -NoOnboard 无关）
-    Write-Host ""
-    Write-Host "即将开始预安装常用 Skills..." -ForegroundColor Cyan
-    Install-Skills
+    # Step 8: 安装预设 Skills
+    if (-not $isUpgrade) {
+        Write-Host ""
+        Write-Host "即将开始预安装常用 Skills..." -ForegroundColor Cyan
+        Install-Skills
+    }
 
     return $true
 }
@@ -1005,81 +1079,15 @@ $installSucceeded = $mainResults.Count -gt 0 -and $mainResults[-1] -eq $true
 Complete-Install -Succeeded:$installSucceeded
 
 # -----------------------------------------------------------------------------
-# 7 Dashboard 启动，浏览器打开解析带 token 的 URL
+# 7 Dashboard 启动
 # -----------------------------------------------------------------------------
-function Invoke-OpenClawDashboardBrowser {
-    $openclawPath = Get-OpenClawCommandPath
-    if (-not $openclawPath) {
-        Write-Host "[!] openclaw command not found; cannot launch dashboard." -ForegroundColor Yellow
-        return
-    }
-
-    $stdoutPath = Join-Path $env:TEMP ("openclaw-dashboard-" + [guid]::NewGuid().ToString("N") + ".out.log")
-    $stderrPath = Join-Path $env:TEMP ("openclaw-dashboard-" + [guid]::NewGuid().ToString("N") + ".err.log")
-    $dashboardUrl = $null
-    $timeoutSeconds = 20
-    $deadline = (Get-Date).AddSeconds($timeoutSeconds)
-    $dashboardProcess = $null
-
-    Write-Host "[*] Launching OpenClaw dashboard..." -ForegroundColor Yellow
-    try {
-        $dashboardProcess = Start-Process `
-            -FilePath $openclawPath `
-            -ArgumentList @("dashboard") `
-            -RedirectStandardOutput $stdoutPath `
-            -RedirectStandardError $stderrPath `
-            -PassThru
-
-        while ((Get-Date) -lt $deadline) {
-            Start-Sleep -Milliseconds 500
-
-            if (Test-Path $stdoutPath) {
-                $stdoutContent = Get-Content -Path $stdoutPath -Raw -ErrorAction SilentlyContinue
-                if ($stdoutContent -match 'Dashboard URL:\s*(https?://\S*#token=\S+)') {
-                    $dashboardUrl = $Matches[1]
-                    break
-                }
-            }
-
-            if ($dashboardProcess.HasExited) {
-                break
-            }
-        }
-
-        if (-not $dashboardUrl) {
-            Write-Host "[!] Could not retrieve dashboard URL with token within $timeoutSeconds seconds." -ForegroundColor Yellow
-            Write-Host "Run \"openclaw dashboard\" manually and copy the \"Dashboard URL:\" line." -ForegroundColor Yellow
-            return
-        }
-
-        Add-Type -AssemblyName PresentationFramework | Out-Null
-        $message = "已获取 Dashboard 地址：`n`n$dashboardUrl`n`n点击确定后将在浏览器中打开。"
-        $result = [System.Windows.MessageBox]::Show(
-            $message,
-            "OpenClaw Dashboard",
-            [System.Windows.MessageBoxButton]::OKCancel,
-            [System.Windows.MessageBoxImage]::Information
-        )
-
-        if ($result -eq [System.Windows.MessageBoxResult]::OK) {
-            Start-Process $dashboardUrl | Out-Null
-            Write-Host "[OK] Dashboard URL opened in browser." -ForegroundColor Green
-        } else {
-            Write-Host "[!] Dashboard open canceled by user." -ForegroundColor Yellow
-        }
-    } finally {
-        if ($dashboardProcess -and -not $dashboardProcess.HasExited) {
-            $dashboardProcess.Kill()
-        }
-        if (Test-Path $stdoutPath) {
-            Remove-Item -Force $stdoutPath
-        }
-        if (Test-Path $stderrPath) {
-            Remove-Item -Force $stderrPath
-        }
-    }
-}
-
 if ($installSucceeded -and !$NoDashboard) {
-    Invoke-OpenClawDashboardBrowser
+    Write-Host ""
+    Write-Host "即将启动 Dashboard，准备检查网关健康状态..." -ForegroundColor Cyan
+    if (Test-GatewayHealthy) {
+        Invoke-OpenClawDashboardBrowser
+    }
+    else {
+        Write-Host "[!] 当前网关异常，您可以执行 openclaw gateway status 进行检查当前状态。" -ForegroundColor Yellow
+    }
 }
