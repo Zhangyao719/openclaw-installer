@@ -978,6 +978,8 @@ function Invoke-OnboardWizard {
         "onboard",
         "--non-interactive",
         "--accept-risk",
+        "--reset",
+        "--reset-scope", "full",
         "--flow", "quickstart",
         "--install-daemon",
         "--skip-channels",
@@ -1155,7 +1157,7 @@ function Main {
 
     Write-Host ""
     if ($installedVersion) {
-        Write-Host "OpenClaw 安装成功 ($installedVersion)!" -ForegroundColor Green
+        Write-Host "OpenClaw ($installedVersion) 安装成功!" -ForegroundColor Green
     }
     else {
         Write-Host "OpenClaw 安装成功!" -ForegroundColor Green
@@ -1196,11 +1198,12 @@ function Main {
         Write-Host " 检查是否有其他迁移操作需要执行。"
         Write-Host ""
 
-        if (Ask-YesNo -Prompt "是否开始 onboard 向导（注意：可能会覆盖当前配置）？" -Default "N") {
+        if (Ask-YesNo -Prompt "是否开始 onboard 向导（警告：会清空当前所有配置）？" -Default "N") {
             Invoke-OnboardWizard
         }
     }
     else {
+        Write-Host "即将开始 onboard 向导，请提前准备模型相关配置。" -ForegroundColor Cyan
         Invoke-OnboardWizard
     }
 
