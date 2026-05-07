@@ -85,11 +85,13 @@ OpenClaw 官方有两种 `install.ps1` 脚本，分别为：
 
   对于 `install-user.ps1` ，如果 node 安装失败，会有 node 安装教程提示。
 
-- 调用 `onboard` 的同时，传递部分参数，简化交互步骤。
+- 调用 `onboard` 的同时，传递部分参数，实现非交互向导。
 
   ```bash
-  # install-user.ps1 会执行以下向导命令
   openclaw onboard --accept-risk \
+    --non-interactive \
+    --reset \
+    --reset full \
     --flow quickstart \
     --skip-channels \
     --skip-skills \
@@ -98,7 +100,13 @@ OpenClaw 官方有两种 `install.ps1` 脚本，分别为：
     --json \
   ```
   
-  对于 `install-script.ps1`，还会额外传入 `--non-interactive`参数，已达到静默安装的效果（非交互向导）。
+  **关于模型设置的说明**：
+  
+  对于 `install-user.ps1`，需要用户准备模型相关配置，脚本会以对话的形式让用户选择模型和输入 apikey。
+  
+  对于 `install-script.ps1`，没有对话交互，而是直接使用 `-AuthChoice`、`-Provider`、`-ApiKey`三个参数来直接指定模型配置信息（**必传**）。
+  
+  具体用法详见下方[📖使用方法](#-使用方法)。
   
 - 预先安装部分常用 Skills
 
@@ -140,13 +148,15 @@ OpenClaw 官方有两种 `install.ps1` 脚本，分别为：
 
 ### 📖使用方法
 
-#### 命令
+#### 命令示例
 
-```powershe
- iwr -useb https://raw.githubusercontent.com/Zhangyao719/openclaw-installer/main/install.ps1 | iex
+```powershell
+# 使用交互安装脚本
+iex ((irm 'https://raw.githubusercontent.com/Zhangyao719/openclaw-installer/main/windows/install-user.ps1').TrimStart([char]0xFEFF))
+
+# 使用非交互脚本（适合服务器直接跑）
+& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/Zhangyao719/openclaw-installer/main/windows/install-user.ps1').TrimStart([char]0xFEFF))) -AuthChoice moonshot-api-key-cn -Provider moonshot-api-key -ApiKey sh-xxx123
 ```
-
-#### 参数
 
 ## FAQ
 

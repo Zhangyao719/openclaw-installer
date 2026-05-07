@@ -9,9 +9,7 @@
 
 $ErrorActionPreference = "Stop"
 
-
 $script:InstallExitCode = 0
-
 
 function Fail-Install {
     param([int]$Code = 1)
@@ -19,7 +17,6 @@ function Fail-Install {
     $script:InstallExitCode = $Code
     return $false
 }
-
 
 function Complete-Install {
     param([bool]$Succeeded)
@@ -35,7 +32,6 @@ function Complete-Install {
     throw "OpenClaw installation failed with exit code $($script:InstallExitCode)."
 }
 
-
 function Ask-YesNo {
     param(
         [string]$Prompt,
@@ -45,6 +41,44 @@ function Ask-YesNo {
     $answer = Read-Host "$Prompt $hint"
     if ([string]::IsNullOrWhiteSpace($answer)) { $answer = $Default }
     return $answer -match '^[Yy]'
+}
+
+function Get-ExecutionPolicyStatus {
+    $policy = Get-ExecutionPolicy
+
+    if ($policy -eq "Restricted" -or $policy -eq "AllSigned") {
+        return @{ Blocked = $true; Policy = $policy }
+    }
+    return @{ Blocked = $false; Policy = $policy }
+}
+
+function Ensure-ExecutionPolicy {
+    $status = Get-ExecutionPolicyStatus
+    if ($status.Blocked) {
+        Write-Host "PowerShell 执行策略已设置为: $($status.Policy)" -ForegroundColor Yellow
+        Write-Host "这会阻止 npm.ps1 等脚本的运行。" -ForegroundColor Yellow
+        Write-Host ""
+        try {
+
+            Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -ErrorAction Stop
+            Write-Host "[OK] 已将 PowerShell 执行策略设置为 RemoteSigned" -ForegroundColor Green
+            return $true
+        }
+        catch {
+
+            Write-Host "无法自动设置 PowerShell 执行策略" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "要修复此问题，请运行:" -ForegroundColor Gray
+            Write-Host "  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "或者以管理员身份运行 PowerShell 并执行:" -ForegroundColor Gray
+            Write-Host "  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine" -ForegroundColor Cyan
+            Write-Host ""
+            return $false
+        }
+    }
+
+    return $true
 }
 
 Write-Host ""
@@ -57,7 +91,6 @@ Write-Host "  ║                                                           ║"
 Write-Host "  ║                    猫鼬AI出品                             ║" -ForegroundColor Cyan
 Write-Host "  ╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
-
 
 if ($PSVersionTable.PSVersion.Major -lt 5) {
     Write-Host "Error: PowerShell 5+ required" -ForegroundColor Red
@@ -93,7 +126,6 @@ if ([string]::IsNullOrWhiteSpace($GitDir)) {
     $GitDir = (Join-Path $userHome "openclaw")
 }
 
-
 function Check-Node {
     try {
         $nodeVersion = (node -v 2>$null)
@@ -116,15 +148,12 @@ function Check-Node {
     return $false
 }
 
-
 function Install-Node {
     Write-Host "[*] Installing Node.js..." -ForegroundColor Yellow
-
 
     if (Get-Command winget -ErrorAction SilentlyContinue) {
         Write-Host "  Using winget..." -ForegroundColor Gray
         winget install OpenJS.NodeJS.LTS --source winget --accept-package-agreements --accept-source-agreements
-
 
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
         if (Check-Node) {
@@ -136,17 +165,14 @@ function Install-Node {
         return $false
     }
 
-
     if (Get-Command choco -ErrorAction SilentlyContinue) {
         Write-Host "  Using Chocolatey..." -ForegroundColor Gray
         choco install nodejs-lts -y
-
 
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
         Write-Host "[OK] Node.js installed via Chocolatey" -ForegroundColor Green
         return $true
     }
-
 
     if (Get-Command scoop -ErrorAction SilentlyContinue) {
         Write-Host "  Using Scoop..." -ForegroundColor Gray
@@ -154,7 +180,6 @@ function Install-Node {
         Write-Host "[OK] Node.js installed via Scoop" -ForegroundColor Green
         return $true
     }
-
 
     Write-Host ""
     Write-Host "无法自动安装 Node.js，请手动安装："
@@ -168,7 +193,6 @@ function Install-Node {
     return $false
 }
 
-
 function Set-NpmRegistry {
     $registry = "https://registry.npmmirror.com/"
     Write-Host "[*] Setting npm registry to $registry ..." -ForegroundColor Yellow
@@ -181,15 +205,15 @@ function Set-NpmRegistry {
     }
 }
 
-
 function Check-ExistingOpenClaw {
     if (Get-OpenClawCommandPath) {
+
         Write-Host "[*] Existing OpenClaw installation detected" -ForegroundColor Yellow
         return $true
     }
+
     return $false
 }
-
 
 function Check-Git {
     try {
@@ -200,7 +224,6 @@ function Check-Git {
         return $false
     }
 }
-
 
 function Add-ToProcessPath {
     param(
@@ -220,12 +243,10 @@ function Add-ToProcessPath {
     $env:Path = "$PathEntry;$env:Path"
 }
 
-
 function Get-PortableGitRoot {
     $base = Join-Path $env:LOCALAPPDATA "OpenClaw\deps"
     return (Join-Path $base "portable-git")
 }
-
 
 function Get-PortableGitCommandPath {
     $root = Get-PortableGitRoot
@@ -241,7 +262,6 @@ function Get-PortableGitCommandPath {
     }
     return $null
 }
-
 
 function Use-PortableGitIfPresent {
     $gitExe = Get-PortableGitCommandPath
@@ -264,7 +284,6 @@ function Use-PortableGitIfPresent {
     }
     return $false
 }
-
 
 function Resolve-PortableGitDownload {
     $releaseApi = "https://api.github.com/repos/git-for-windows/git/releases/latest"
@@ -291,7 +310,6 @@ function Resolve-PortableGitDownload {
         Url  = $asset.browser_download_url
     }
 }
-
 
 function Install-PortableGit {
     if (Use-PortableGitIfPresent) {
@@ -342,7 +360,6 @@ function Install-PortableGit {
     Write-Host "[OK] User-local Git ready: $portableVersion" -ForegroundColor Green
 }
 
-
 function Ensure-Git {
     if (Check-Git) { return $true }
     if (Use-PortableGitIfPresent) { return $true }
@@ -364,7 +381,6 @@ function Ensure-Git {
     return $false
 }
 
-
 function Get-OpenClawCommandPath {
     $openclawCmd = Get-Command openclaw.cmd -ErrorAction SilentlyContinue
     if ($openclawCmd -and $openclawCmd.Source) {
@@ -379,7 +395,6 @@ function Get-OpenClawCommandPath {
     return $null
 }
 
-
 function Invoke-OpenClawCommand {
     param(
         [Parameter(ValueFromRemainingArguments = $true)]
@@ -393,7 +408,6 @@ function Invoke-OpenClawCommand {
 
     & $commandPath @Arguments
 }
-
 
 function Resolve-CommandPath {
     param(
@@ -411,7 +425,6 @@ function Resolve-CommandPath {
     return $null
 }
 
-
 function Get-NpmCommandPath {
     $path = Resolve-CommandPath -Candidates @("npm.cmd", "npm.exe", "npm")
     if (-not $path) {
@@ -420,16 +433,13 @@ function Get-NpmCommandPath {
     return $path
 }
 
-
 function Get-CorepackCommandPath {
     return (Resolve-CommandPath -Candidates @("corepack.cmd", "corepack.exe", "corepack"))
 }
 
-
 function Get-PnpmCommandPath {
     return (Resolve-CommandPath -Candidates @("pnpm.cmd", "pnpm.exe", "pnpm"))
 }
-
 
 function Get-NpmGlobalBinCandidates {
     param(
@@ -447,7 +457,6 @@ function Get-NpmGlobalBinCandidates {
 
     return $candidates | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 }
-
 
 function Ensure-OpenClawOnPath {
     if (Get-OpenClawCommandPath) {
@@ -491,7 +500,6 @@ function Ensure-OpenClawOnPath {
     return $false
 }
 
-
 function Ensure-Pnpm {
     if (Get-PnpmCommandPath) {
         return
@@ -522,7 +530,6 @@ function Ensure-Pnpm {
     Write-Host "[OK] pnpm installed" -ForegroundColor Green
 }
 
-
 function Resolve-NpmOpenClawInstallSpec {
     param(
         [string]$PackageName,
@@ -548,7 +555,6 @@ function Resolve-NpmOpenClawInstallSpec {
     return "$PackageName@$trimmedTag"
 }
 
-
 function Install-OpenClaw {
     if ([string]::IsNullOrWhiteSpace($Tag)) {
         $Tag = "latest"
@@ -556,7 +562,6 @@ function Install-OpenClaw {
     if (-not (Ensure-Git)) {
         return $false
     }
-
 
     $packageName = "openclaw"
     if ($Tag -eq "beta" -or $Tag -match "^beta\.") {
@@ -604,7 +609,6 @@ function Install-OpenClaw {
     Write-Host "[OK] OpenClaw 已安装" -ForegroundColor Green
     return $true
 }
-
 
 function Install-OpenClawFromGit {
     param(
@@ -674,7 +678,6 @@ function Install-OpenClawFromGit {
     return $true
 }
 
-
 function Get-LegacyRepoDir {
     if (-not [string]::IsNullOrWhiteSpace($env:OPENCLAW_GIT_DIR)) {
         return $env:OPENCLAW_GIT_DIR
@@ -682,7 +685,6 @@ function Get-LegacyRepoDir {
     $userHome = [Environment]::GetFolderPath("UserProfile")
     return (Join-Path $userHome "openclaw")
 }
-
 
 function Remove-LegacySubmodule {
     param(
@@ -698,7 +700,6 @@ function Remove-LegacySubmodule {
     }
 }
 
-
 function Run-Doctor {
     Write-Host "[*] 运行 doctor 程序以迁移设置..." -ForegroundColor Yellow
     try {
@@ -709,7 +710,6 @@ function Run-Doctor {
     }
     Write-Host "[OK] Migration complete" -ForegroundColor Green
 }
-
 
 function Test-GatewayServiceLoaded {
     try {
@@ -727,7 +727,6 @@ function Test-GatewayServiceLoaded {
     }
     return $false
 }
-
 
 function Refresh-GatewayServiceIfLoaded {
     if (-not (Get-OpenClawCommandPath)) {
@@ -755,7 +754,6 @@ function Refresh-GatewayServiceIfLoaded {
         Write-Host "[!] Gateway service restart failed; continuing." -ForegroundColor Yellow
     }
 }
-
 
 function Test-GatewayHealthy {
     $commandPath = Get-OpenClawCommandPath
@@ -789,7 +787,6 @@ function Test-GatewayHealthy {
     }
 }
 
-
 function Invoke-OnboardWizard {
     $choiceToApiKeyParam = @{
         'custom-api-key'       = '--custom-api-key'
@@ -810,12 +807,12 @@ function Invoke-OnboardWizard {
     }
 
     $groups = [ordered]@{
-        '自定义'          = @('custom-api-key')
-        'MoonShot'        = @('moonshot-api-key', 'moonshot-api-key-cn')
-        'Kimi Coding'     = @('kimi-code-api-key')
-        '智谱 (ZAI)'      = @('zai-api-key', 'zai-coding-global', 'zai-coding-cn', 'zai-global', 'zai-cn')
-        'MiniMax'         = @('minimax-global-api', 'minimax-global-oauth', 'minimax-cn-oauth', 'minimax-cn-api')
-        'OpenAI'          = @('openai-codex', 'openai-api-key')
+        '自定义'         = @('custom-api-key')
+        'MoonShot'    = @('moonshot-api-key', 'moonshot-api-key-cn')
+        'Kimi Coding' = @('kimi-code-api-key')
+        '智谱 (ZAI)'    = @('zai-api-key', 'zai-coding-global', 'zai-coding-cn', 'zai-global', 'zai-cn')
+        'MiniMax'     = @('minimax-global-api', 'minimax-global-oauth', 'minimax-cn-oauth', 'minimax-cn-api')
+        'OpenAI'      = @('openai-codex', 'openai-api-key')
     }
 
     $allChoices = [System.Collections.Generic.List[string]]::new()
@@ -891,6 +888,8 @@ function Invoke-OnboardWizard {
         "onboard",
         "--non-interactive",
         "--accept-risk",
+        "--reset",
+        "--reset-scope", "full",
         "--flow", "quickstart",
         "--install-daemon",
         "--skip-channels",
@@ -902,7 +901,6 @@ function Invoke-OnboardWizard {
 
     Invoke-OpenClawCommand @onboardArgs
 }
-
 
 function Install-Skills {
     $skills = @(
@@ -946,11 +944,17 @@ function Install-Skills {
     }
 }
 
-
 function Main {
+
     if ($InstallMethod -ne "npm" -and $InstallMethod -ne "git") {
         Write-Host "Error: invalid -InstallMethod (use npm or git)." -ForegroundColor Red
         return (Fail-Install -Code 2)
+    }
+
+    if (-not (Ensure-ExecutionPolicy)) {
+        Write-Host ""
+        Write-Host "由于执行策略的限制，安装无法继续进行。" -ForegroundColor Red
+        return (Fail-Install)
     }
 
     if ($DryRun) {
@@ -971,15 +975,12 @@ function Main {
 
     Remove-LegacySubmodule -RepoDir $RepoDir
 
-
     $isUpgrade = Check-ExistingOpenClaw
-
 
     if (-not (Check-Node)) {
         if (-not (Install-Node)) {
             return (Fail-Install)
         }
-
 
         if (-not (Check-Node)) {
             Write-Host ""
@@ -989,11 +990,9 @@ function Main {
         }
     }
 
-
     Set-NpmRegistry
 
     $finalGitDir = $null
-
 
     if ($InstallMethod -eq "git") {
         try {
@@ -1005,6 +1004,7 @@ function Main {
         }
         catch { }
         $finalGitDir = $GitDir
+
         if (-not (Install-OpenClawFromGit -RepoDir $GitDir -SkipUpdate:$NoGitUpdate)) {
             return (Fail-Install)
         }
@@ -1021,18 +1021,16 @@ function Main {
     }
 
     if (-not (Ensure-OpenClawOnPath)) {
-        Write-Host "Install completed, but OpenClaw is not on PATH yet." -ForegroundColor Yellow
-        Write-Host "Open a new terminal, then run: openclaw doctor" -ForegroundColor Cyan
+        Write-Host "安装已完成，但 OpenClaw 未能添加到系统路径 PATH 中。" -ForegroundColor Yellow
+        Write-Host "请打开一个新的终端，然后运行: openclaw doctor" -ForegroundColor Cyan
         return
     }
 
     Refresh-GatewayServiceIfLoaded
 
-
     if ($isUpgrade -or $InstallMethod -eq "git") {
         Run-Doctor
     }
-
 
     $installedVersion = $null
     try {
@@ -1055,7 +1053,7 @@ function Main {
 
     Write-Host ""
     if ($installedVersion) {
-        Write-Host "OpenClaw 安装成功 ($installedVersion)!" -ForegroundColor Green
+        Write-Host "OpenClaw ($installedVersion) 安装成功!" -ForegroundColor Green
     }
     else {
         Write-Host "OpenClaw 安装成功!" -ForegroundColor Green
@@ -1089,21 +1087,20 @@ function Main {
         Write-Host ""
     }
 
-
     if ($isUpgrade) {
         Write-Host "升级完成，您可以运行 " -NoNewline
         Write-Host "openclaw doctor" -ForegroundColor Cyan -NoNewline
         Write-Host " 检查是否有其他迁移操作需要执行。"
         Write-Host ""
 
-        if (Ask-YesNo -Prompt "是否开始 onboard 向导（注意：可能会覆盖当前配置）？" -Default "N") {
+        if (Ask-YesNo -Prompt "是否开始 onboard 向导（警告：会清空当前所有配置）？" -Default "N") {
             Invoke-OnboardWizard
         }
     }
     else {
+        Write-Host "即将开始 onboard 向导，请提前准备模型相关配置。" -ForegroundColor Cyan
         Invoke-OnboardWizard
     }
-
 
     if ($isUpgrade) {
         Write-Host ""
@@ -1121,11 +1118,9 @@ function Main {
     return $true
 }
 
-
 $mainResults = @(Main)
 $installSucceeded = $mainResults.Count -gt 0 -and $mainResults[-1] -eq $true
 Complete-Install -Succeeded:$installSucceeded
-
 
 function Invoke-OpenClawDashboardBrowser {
     Write-Host ""
@@ -1210,6 +1205,6 @@ if ($installSucceeded -and !$NoDashboard) {
         Invoke-OpenClawDashboardBrowser
     }
     else {
-        Write-Host "[!] 当前网关异常，您可以执行 openclaw gateway status 进行检查当前状态。" -ForegroundColor Yellow
+        Write-Host "[!] 当前网关异常，您可以执行 openclaw gateway status 进行检查当前状态。" -ForegroundColor Red
     }
 }

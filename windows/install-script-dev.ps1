@@ -23,7 +23,10 @@ param(
     [string]$GitDir,
     [switch]$NoOnboard,
     [switch]$NoGitUpdate,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [string]$AuthChoice, # 模型供应商的认证方式，比如 moonshot-api-key-cn
+    [string]$Provider, # apikey 的前缀，比如 moonshot-api-key
+    [string]$ApiKey # apikey 的值，比如 sh-xxxx。配合 Provider 使用，传递到 onboard 中就组成了 `--moonshot-api-key sh-xxxx`
 )
 
 $ErrorActionPreference = "Stop"
@@ -923,6 +926,17 @@ function Main {
         return (Fail-Install -Code 2)
     }
 
+    # 检查模型配置参数（必须一起提供）会传递给 onboard
+    $onboardArgProvidedCount = @(
+        -not [string]::IsNullOrWhiteSpace($AuthChoice),
+        -not [string]::IsNullOrWhiteSpace($Provider),
+        -not [string]::IsNullOrWhiteSpace($ApiKey)
+    ) | Where-Object { $_ } | Measure-Object | Select-Object -ExpandProperty Count
+    if ($onboardArgProvidedCount -ne 0 -and $onboardArgProvidedCount -ne 3) {
+        Write-Host "Error: -AuthChoice, -Provider, -ApiKey must be provided together." -ForegroundColor Red
+        return (Fail-Install -Code 2)
+    }
+
     # 须在 DryRun、Remove-LegacySubmodule、Check-Node、Install-OpenClaw 等之前执行：任何分支都可能触发 npm/pnpm。
     if (-not (Ensure-ExecutionPolicy)) {
         Write-Host ""
@@ -1107,7 +1121,28 @@ function Main {
         else {
             Write-Host "Starting setup..." -ForegroundColor Cyan
             Write-Host ""
-            Invoke-OpenClawCommand onboard --non-interactive --accept-risk --flow quickstart --skip-channels --skip-skills --skip-search --skip-ui
+
+            # 构建 onboard 参数并执行
+            $onboardArgs = @(
+                "onboard",
+                "--non-interactive",
+                "--accept-risk",
+                "--reset",
+                "--reset-scope", "full",
+                "--flow", "quickstart",
+                "--skip-channels",
+                "--skip-skills",
+                "--skip-search",
+                "--skip-ui"
+            )
+            if ($onboardArgProvidedCount -eq 3) {
+                $normalizedProvider = $Provider.Trim()
+                if ($normalizedProvider.StartsWith("--")) {
+                    $normalizedProvider = $normalizedProvider.Substring(2)
+                }
+                $onboardArgs += @("--auth-choice", $AuthChoice, "--$normalizedProvider", $ApiKey)
+            }
+            Invoke-OpenClawCommand @onboardArgs
         }
     }
 
