@@ -7,13 +7,13 @@
 # 勿用 `iwr ... | iex`（管道传入的是响应对象）。
 #
 # 流程总览（主入口：Main）
-# 0 前置       — 参数、环境变量、退出码、横幅、PowerShell 版本、默认 GitDir
+# 0 前置       — 参数、环境变量、退出码、横幅、PowerShell 版本、脚本执行策略、默认 GitDir
 # 1 Node.js    — 1.1 检测版本；1.2 自动安装；1.3 设置 npm 淘宝镜像 1.4 已有安装 — 是否已存在 openclaw（升级判断）
 # 2 Git        — 2.1 检测；2.2 进程 PATH；2.3 便携目录与 git.exe；2.4 启用便携；2.5 解析 MinGit；2.6 安装便携；2.7 确保可用
 # 3 命令与 PATH — openclaw/npm/pnpm 路径、调用、全局 bin、补全 PATH、确保 pnpm
-# 4 安装本体   — 4.1 npm 包说明；4.2 npm 全局安装；4.3 Git 源码克隆构建；4.4.1/4.4.2 遗留子模块目录解析与删除
-# 5 装后       — 5.1 doctor 迁移；5.2 网关服务刷新；5.3 预装 Skills（全新安装）
-# 6 Main       — 总控与 onboard
+# 4 安装本体   — 4.1 npm 包说明；4.2 npm 全局安装；4.3 Git 源码克隆构建；4.4.1/4.4.2 遗留子模块目录解析与删除；
+# 5 装后       — 5.1 doctor 迁移；5.2 网关服务刷新；5.3 onboard 向导；5.4 预装 Skills（全新安装）；
+# 6 Main       — 主函数
 # 7 Dashboard  — 获取并打开链接
 
 param(
@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 
 $script:InstallExitCode = 0
 
-# 记录失败退出码，供 Complete-Install 使用。
+# 工具函数——记录失败退出码，供 Complete-Install 使用。
 function Fail-Install {
     param([int]$Code = 1)
 
@@ -41,7 +41,7 @@ function Fail-Install {
     return $false
 }
 
-# 安装结束：失败时 exit 或抛错（是否为本脚本直接运行取决于 PSCommandPath）。
+# 工具函数——安装结束：失败时 exit 或抛错（是否为本脚本直接运行取决于 PSCommandPath）。
 function Complete-Install {
     param([bool]$Succeeded)
 
@@ -56,7 +56,7 @@ function Complete-Install {
     throw "OpenClaw installation failed with exit code $($script:InstallExitCode)."
 }
 
-# 向用户提出 Yes/No 问题，支持默认值，返回 $true 表示 Yes，$false 表示 No
+# 工具函数——向用户提出 Yes/No 问题，支持默认值，返回 $true 表示 Yes，$false 表示 No
 function Ask-YesNo {
     param(
         [string]$Prompt,          # 要显示的提示文本
@@ -66,6 +66,47 @@ function Ask-YesNo {
     $answer = Read-Host "$Prompt $hint"
     if ([string]::IsNullOrWhiteSpace($answer)) { $answer = $Default }
     return $answer -match '^[Yy]'
+}
+
+# 获取当前 PowerShell 执行策略
+function Get-ExecutionPolicyStatus {
+    $policy = Get-ExecutionPolicy
+    # Restricted: 几乎禁止脚本
+    # AllSigned: npm 自带脚本往往未按本机信任链签名，实务上常等同于阻塞
+    if ($policy -eq "Restricted" -or $policy -eq "AllSigned") {
+        return @{ Blocked = $true; Policy = $policy } # 脚本执行受限
+    }
+    return @{ Blocked = $false; Policy = $policy } # 脚本执行不受限
+}
+
+# 确保 PowerShell 执行策略为 RemoteSigned
+function Ensure-ExecutionPolicy {
+    $status = Get-ExecutionPolicyStatus
+    if ($status.Blocked) {
+        Write-Host "PowerShell 执行策略已设置为: $($status.Policy)" -ForegroundColor Yellow
+        Write-Host "这会阻止 npm.ps1 等脚本的运行。" -ForegroundColor Yellow
+        Write-Host ""
+        try {
+            # Scope Process：只影响当前 powershell 进程，不写持久 Machine/User 策略，退出会话后即失效。
+            Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -ErrorAction Stop
+            Write-Host "[OK] 已将 PowerShell 执行策略设置为 RemoteSigned" -ForegroundColor Green
+            return $true
+        }
+        catch {
+            # 组策略或权限禁止改写时：提示用户在本进程或管理员下手动放宽。
+            Write-Host "无法自动设置 PowerShell 执行策略" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "要修复此问题，请运行:" -ForegroundColor Gray
+            Write-Host "  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "或者以管理员身份运行 PowerShell 并执行:" -ForegroundColor Gray
+            Write-Host "  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine" -ForegroundColor Cyan
+            Write-Host ""
+            return $false
+        }
+    }
+    # 策略原本即宽松（如 RemoteSigned），无需改动。
+    return $true
 }
 
 Write-Host ""
@@ -118,7 +159,7 @@ if ([string]::IsNullOrWhiteSpace($GitDir)) {
 # 1 Node.js
 # -----------------------------------------------------------------------------
 
-# 1.1 检测本机 Node 是否存在且主版本 >= 22。
+# 检测本机 Node 是否存在且主版本 >= 22。
 function Check-Node {
     try {
         $nodeVersion = (node -v 2>$null)
@@ -141,7 +182,7 @@ function Check-Node {
     return $false
 }
 
-# 1.2 依次尝试 winget / Chocolatey / Scoop 安装 Node LTS；失败则提示手动安装。
+# 依次尝试 winget / Chocolatey / Scoop 安装 Node LTS；失败则提示手动安装。
 function Install-Node {
     Write-Host "[*] Installing Node.js..." -ForegroundColor Yellow
 
@@ -193,7 +234,7 @@ function Install-Node {
     return $false
 }
 
-# 1.3 将 npm 源切换为淘宝镜像；失败只警告，不阻断安装。
+# 将 npm 源切换为淘宝镜像；失败只警告，不阻断安装。
 function Set-NpmRegistry {
     $registry = "https://registry.npmmirror.com/"
     Write-Host "[*] Setting npm registry to $registry ..." -ForegroundColor Yellow
@@ -206,18 +247,15 @@ function Set-NpmRegistry {
     }
 }
 
-# -----------------------------------------------------------------------------
-# 1.4 已有安装（升级判断）
-# -----------------------------------------------------------------------------
 
-# 校验是否已经存在 openclaw
-# 判断依据：当前 PATH 能否找到 openclaw.cmd 或 openclaw 命令
-# 作用：如果已存在，则代表是升级场景，否则就是全新安装
+# 判断是否已安装 OpenClaw
 function Check-ExistingOpenClaw {
     if (Get-OpenClawCommandPath) {
+        # PATH 上存在 openclaw 相关命令 -> 升级场景
         Write-Host "[*] Existing OpenClaw installation detected" -ForegroundColor Yellow
         return $true
     }
+    # 不存在 -> 全新安装
     return $false
 }
 
@@ -225,7 +263,7 @@ function Check-ExistingOpenClaw {
 # 2 Git
 # -----------------------------------------------------------------------------
 
-# 2.1 检测当前进程能否调用 git。
+# 检测当前进程能否调用 git。
 function Check-Git {
     try {
         $null = Get-Command git -ErrorAction Stop
@@ -236,7 +274,7 @@ function Check-Git {
     }
 }
 
-# 2.2 将目录prepend到当前进程的 Path（不修改持久化环境变量）。
+# 将目录prepend到当前进程的 Path（不修改持久化环境变量）。
 function Add-ToProcessPath {
     param(
         [Parameter(Mandatory = $true)]
@@ -255,13 +293,13 @@ function Add-ToProcessPath {
     $env:Path = "$PathEntry;$env:Path"
 }
 
-# 2.3 返回便携 Git 的安装根目录（LOCALAPPDATA 下固定路径）。
+# 返回便携 Git 的安装根目录（LOCALAPPDATA 下固定路径）。
 function Get-PortableGitRoot {
     $base = Join-Path $env:LOCALAPPDATA "OpenClaw\deps"
     return (Join-Path $base "portable-git")
 }
 
-# 2.3 在便携根目录下查找 git.exe 的实际路径。
+# 在便携根目录下查找 git.exe 的实际路径。
 function Get-PortableGitCommandPath {
     $root = Get-PortableGitRoot
     foreach ($candidate in @(
@@ -277,7 +315,7 @@ function Get-PortableGitCommandPath {
     return $null
 }
 
-# 2.4 若已存在便携 Git，则注入 PATH 并确认 git 可用。
+# 若已存在便携 Git，则注入 PATH 并确认 git 可用。
 function Use-PortableGitIfPresent {
     $gitExe = Get-PortableGitCommandPath
     if (-not $gitExe) {
@@ -300,7 +338,7 @@ function Use-PortableGitIfPresent {
     return $false
 }
 
-# 2.5 从 GitHub API 解析最新 MinGit zip 的下载地址与文件名。
+# 从 GitHub API 解析最新 MinGit zip 的下载地址与文件名。
 function Resolve-PortableGitDownload {
     $releaseApi = "https://api.github.com/repos/git-for-windows/git/releases/latest"
     $headers = @{
@@ -327,7 +365,7 @@ function Resolve-PortableGitDownload {
     }
 }
 
-# 2.6 下载并解压 MinGit 到用户目录下的便携路径；已存在则跳过下载。
+# 下载并解压 MinGit 到用户目录下的便携路径；已存在则跳过下载。
 function Install-PortableGit {
     if (Use-PortableGitIfPresent) {
         $portableVersion = (& git --version 2>$null)
@@ -377,7 +415,7 @@ function Install-PortableGit {
     Write-Host "[OK] User-local Git ready: $portableVersion" -ForegroundColor Green
 }
 
-# 2.7 确保 git 可用：系统 PATH、已有便携、或现场安装便携；仍失败则提示手动安装。
+# 确保 git 可用：系统 PATH、已有便携、或现场安装便携；仍失败则提示手动安装。
 function Ensure-Git {
     if (Check-Git) { return $true }
     if (Use-PortableGitIfPresent) { return $true }
@@ -565,7 +603,7 @@ function Ensure-Pnpm {
 # 4 安装 OpenClaw 本体
 # -----------------------------------------------------------------------------
 
-# 4.1 将 Tag/显式 spec 转为 npm 可安装的包说明字符串。
+#将 Tag/显式 spec 转为 npm 可安装的包说明字符串。
 function Resolve-NpmOpenClawInstallSpec {
     param(
         [string]$PackageName,
@@ -591,7 +629,7 @@ function Resolve-NpmOpenClawInstallSpec {
     return "$PackageName@$trimmedTag"
 }
 
-# 4.2 使用 npm 全局安装 OpenClaw（临时收紧 npm 输出与环境变量）。
+# 使用 npm 全局安装 OpenClaw（临时收紧 npm 输出与环境变量）。
 function Install-OpenClaw {
     if ([string]::IsNullOrWhiteSpace($Tag)) {
         $Tag = "latest"
@@ -648,7 +686,7 @@ function Install-OpenClaw {
     return $true
 }
 
-# 4.3 克隆或更新仓库，pnpm 安装/构建/UI，生成 ~/.local/bin/openclaw.cmd 并写入 PATH。
+# 克隆或更新仓库，pnpm 安装/构建/UI，生成 ~/.local/bin/openclaw.cmd 并写入 PATH。
 function Install-OpenClawFromGit {
     param(
         [string]$RepoDir,
@@ -717,7 +755,7 @@ function Install-OpenClawFromGit {
     return $true
 }
 
-# 4.4.1 解析遗留清理所用的仓库目录（环境变量 OPENCLAW_GIT_DIR 或 ~/openclaw）。
+# 解析遗留清理所用的仓库目录（环境变量 OPENCLAW_GIT_DIR 或 ~/openclaw）。
 function Get-LegacyRepoDir {
     if (-not [string]::IsNullOrWhiteSpace($env:OPENCLAW_GIT_DIR)) {
         return $env:OPENCLAW_GIT_DIR
@@ -726,7 +764,7 @@ function Get-LegacyRepoDir {
     return (Join-Path $userHome "openclaw")
 }
 
-# 4.4.2 删除仓库内旧版 Peekaboo 子模块目录（若存在）。
+# 删除仓库内旧版 Peekaboo 子模块目录（若存在）。
 function Remove-LegacySubmodule {
     param(
         [string]$RepoDir
@@ -745,7 +783,7 @@ function Remove-LegacySubmodule {
 # 5 装后处理
 # -----------------------------------------------------------------------------
 
-# 5.1 非交互运行 openclaw doctor，用于配置迁移（忽略错误）。
+# 非交互运行 openclaw doctor，用于配置迁移（忽略错误）。
 function Run-Doctor {
     Write-Host "[*] 运行 doctor 程序以迁移设置..." -ForegroundColor Yellow
     try {
@@ -775,7 +813,7 @@ function Test-GatewayServiceLoaded {
     return $false
 }
 
-# 5.2 若网关已在运行，则强制重装配置并尝试重启服务。
+# 若网关已在运行，则强制重装配置并尝试重启服务。
 function Refresh-GatewayServiceIfLoaded {
     if (-not (Get-OpenClawCommandPath)) {
         return
@@ -838,10 +876,7 @@ function Test-GatewayHealthy {
     }
 }
 
-# -----------------------------------------------------------------------------
-# 5.3 onboard 向导
-# -----------------------------------------------------------------------------
-
+# onboard 向导
 function Invoke-OnboardWizard {
     $choiceToApiKeyParam = @{
         'custom-api-key'       = '--custom-api-key'
@@ -862,12 +897,12 @@ function Invoke-OnboardWizard {
     }
 
     $groups = [ordered]@{
-        '自定义'          = @('custom-api-key')
-        'MoonShot'        = @('moonshot-api-key', 'moonshot-api-key-cn')
-        'Kimi Coding'     = @('kimi-code-api-key')
-        '智谱 (ZAI)'      = @('zai-api-key', 'zai-coding-global', 'zai-coding-cn', 'zai-global', 'zai-cn')
-        'MiniMax'         = @('minimax-global-api', 'minimax-global-oauth', 'minimax-cn-oauth', 'minimax-cn-api')
-        'OpenAI'          = @('openai-codex', 'openai-api-key')
+        '自定义'         = @('custom-api-key')
+        'MoonShot'    = @('moonshot-api-key', 'moonshot-api-key-cn')
+        'Kimi Coding' = @('kimi-code-api-key')
+        '智谱 (ZAI)'    = @('zai-api-key', 'zai-coding-global', 'zai-coding-cn', 'zai-global', 'zai-cn')
+        'MiniMax'     = @('minimax-global-api', 'minimax-global-oauth', 'minimax-cn-oauth', 'minimax-cn-api')
+        'OpenAI'      = @('openai-codex', 'openai-api-key')
     }
 
     $allChoices = [System.Collections.Generic.List[string]]::new()
@@ -955,11 +990,7 @@ function Invoke-OnboardWizard {
     Invoke-OpenClawCommand @onboardArgs
 }
 
-# -----------------------------------------------------------------------------
-# 5.4 预装 Skills
-# -----------------------------------------------------------------------------
-
-# 5.3 从 ClawHub 逐个安装预设 Skills；单个失败只警告不阻断；升级场景不调用。
+# 从 ClawHub 逐个安装预设 Skills；单个失败只警告不阻断；升级场景不调用。
 function Install-Skills {
     $skills = @(
         'self-improving-agent',
@@ -1003,14 +1034,21 @@ function Install-Skills {
 }
 
 # -----------------------------------------------------------------------------
-# 6 Main：总控
+# 6 Main：总控（串联前面的步骤，都在此依次执行）
 # -----------------------------------------------------------------------------
 
-# 串联 DryRun、清理遗留目录、Node、npm/git 安装、PATH、网关、doctor、版本展示与 onboard。
 function Main {
+    # Process 0：前置环境校验
     if ($InstallMethod -ne "npm" -and $InstallMethod -ne "git") {
         Write-Host "Error: invalid -InstallMethod (use npm or git)." -ForegroundColor Red
         return (Fail-Install -Code 2)
+    }
+
+    # 须在 DryRun、Remove-LegacySubmodule、Check-Node、Install-OpenClaw 等之前执行：任何分支都可能触发 npm/pnpm。
+    if (-not (Ensure-ExecutionPolicy)) {
+        Write-Host ""
+        Write-Host "由于执行策略的限制，安装无法继续进行。" -ForegroundColor Red
+        return (Fail-Install)
     }
 
     if ($DryRun) {
@@ -1034,7 +1072,7 @@ function Main {
     # 检查是否已经存在 openclaw
     $isUpgrade = Check-ExistingOpenClaw
 
-    # Step 1: Node.js
+    # Process 1: Node.js
     if (-not (Check-Node)) {
         if (-not (Install-Node)) {
             return (Fail-Install)
@@ -1049,12 +1087,12 @@ function Main {
         }
     }
 
-    # Step 1.3: 设置 npm 淘宝镜像
+    # Process 1.3: 设置 npm 淘宝镜像
     Set-NpmRegistry
 
     $finalGitDir = $null
 
-    # Step 2: 安装 OpenClaw（git/npm 安装两个分支）
+    # Process 4: 安装 OpenClaw（git/npm 安装两个分支）（包含 Process 2、Process 3）
     if ($InstallMethod -eq "git") {
         try {
             $npmCommand = Get-NpmCommandPath
@@ -1065,6 +1103,7 @@ function Main {
         }
         catch { }
         $finalGitDir = $GitDir
+        # 使用 git 安装 OpenClaw
         if (-not (Install-OpenClawFromGit -RepoDir $GitDir -SkipUpdate:$NoGitUpdate)) {
             return (Fail-Install)
         }
@@ -1081,14 +1120,14 @@ function Main {
     }
 
     if (-not (Ensure-OpenClawOnPath)) {
-        Write-Host "Install completed, but OpenClaw is not on PATH yet." -ForegroundColor Yellow
-        Write-Host "Open a new terminal, then run: openclaw doctor" -ForegroundColor Cyan
+        Write-Host "安装已完成，但 OpenClaw 未能添加到系统路径 PATH 中。" -ForegroundColor Yellow
+        Write-Host "请打开一个新的终端，然后运行: openclaw doctor" -ForegroundColor Cyan
         return
     }
 
     Refresh-GatewayServiceIfLoaded
 
-    # Step 3: 如果升级或用 git 安装，则调用 Run-Doctor 进行自检或迁移操作
+    # Process 5: 如果升级或用 git 安装，则调用 Run-Doctor 进行自检或迁移操作
     # 确保在升级或源码安装后运行必要的自检和升级逻辑，防止遗留问题。
     if ($isUpgrade -or $InstallMethod -eq "git") {
         Run-Doctor
@@ -1150,7 +1189,7 @@ function Main {
         Write-Host ""
     }
 
-    # Step 7: onboard
+    # Process 5.3: onboard
     if ($isUpgrade) {
         Write-Host "升级完成，您可以运行 " -NoNewline
         Write-Host "openclaw doctor" -ForegroundColor Cyan -NoNewline
@@ -1165,7 +1204,7 @@ function Main {
         Invoke-OnboardWizard
     }
 
-    # Step 8: 安装预设 Skills
+    # Process 5.4: 预装 Skills
     if ($isUpgrade) {
         Write-Host ""
         if (Ask-YesNo -Prompt "是否安装预设 Skills（注意：可能会覆盖当前配置）？" -Default "Y") {
@@ -1273,6 +1312,6 @@ if ($installSucceeded -and !$NoDashboard) {
         Invoke-OpenClawDashboardBrowser
     }
     else {
-        Write-Host "[!] 当前网关异常，您可以执行 openclaw gateway status 进行检查当前状态。" -ForegroundColor Yellow
+        Write-Host "[!] 当前网关异常，您可以执行 openclaw gateway status 进行检查当前状态。" -ForegroundColor Red
     }
 }
