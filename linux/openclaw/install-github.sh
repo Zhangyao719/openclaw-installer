@@ -5,15 +5,15 @@ set -euo pipefail
 # Usage: curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash
 
 BOLD='\033[1m'
-ACCENT='\033[38;2;255;77;77m'       # coral-bright  #ff4d4d
+ACCENT='\033[38;2;255;77;77m' # coral-bright  #ff4d4d
 # shellcheck disable=SC2034
 ACCENT_BRIGHT='\033[38;2;255;110;110m' # lighter coral
-INFO='\033[38;2;136;146;176m'       # text-secondary #8892b0
-SUCCESS='\033[38;2;0;229;204m'      # cyan-bright   #00e5cc
-WARN='\033[38;2;255;176;32m'        # amber (no site equiv, keep warm)
-ERROR='\033[38;2;230;57;70m'        # coral-mid     #e63946
-MUTED='\033[38;2;90;100;128m'       # text-muted    #5a6480
-NC='\033[0m' # No Color
+INFO='\033[38;2;136;146;176m'          # text-secondary #8892b0
+SUCCESS='\033[38;2;0;229;204m'         # cyan-bright   #00e5cc
+WARN='\033[38;2;255;176;32m'           # amber (no site equiv, keep warm)
+ERROR='\033[38;2;230;57;70m'           # coral-mid     #e63946
+MUTED='\033[38;2;90;100;128m'          # text-muted    #5a6480
+NC='\033[0m'                           # No Color
 
 DEFAULT_TAGLINE="All your chats, one OpenClaw."
 NODE_DEFAULT_MAJOR=24
@@ -41,11 +41,11 @@ mktempfile() {
 
 DOWNLOADER=""
 detect_downloader() {
-    if command -v curl &> /dev/null; then
+    if command -v curl &>/dev/null; then
         DOWNLOADER="curl"
         return 0
     fi
-    if command -v wget &> /dev/null; then
+    if command -v wget &>/dev/null; then
         DOWNLOADER="wget"
         return 0
     fi
@@ -108,20 +108,20 @@ gum_is_tty() {
 
 gum_detect_os() {
     case "$(uname -s 2>/dev/null || true)" in
-        Darwin) echo "Darwin" ;;
-        Linux) echo "Linux" ;;
-        *) echo "unsupported" ;;
+    Darwin) echo "Darwin" ;;
+    Linux) echo "Linux" ;;
+    *) echo "unsupported" ;;
     esac
 }
 
 gum_detect_arch() {
     case "$(uname -m 2>/dev/null || true)" in
-        x86_64|amd64) echo "x86_64" ;;
-        arm64|aarch64) echo "arm64" ;;
-        i386|i686) echo "i386" ;;
-        armv7l|armv7) echo "armv7" ;;
-        armv6l|armv6) echo "armv6" ;;
-        *) echo "unknown" ;;
+    x86_64 | amd64) echo "x86_64" ;;
+    arm64 | aarch64) echo "arm64" ;;
+    i386 | i686) echo "i386" ;;
+    armv7l | armv7) echo "armv7" ;;
+    armv6l | armv6) echo "armv6" ;;
+    *) echo "unknown" ;;
     esac
 }
 
@@ -221,17 +221,17 @@ bootstrap_gum_temp() {
 
 print_gum_status() {
     case "$GUM_STATUS" in
-        found)
-            ui_success "gum available (${GUM_REASON})"
-            ;;
-        installed)
-            ui_success "gum bootstrapped (${GUM_REASON}, v${GUM_VERSION})"
-            ;;
-        *)
-            if [[ -n "$GUM_REASON" && "$GUM_REASON" != "non-interactive shell (auto-disabled)" ]]; then
-                ui_info "gum skipped (${GUM_REASON})"
-            fi
-            ;;
+    found)
+        ui_success "gum available (${GUM_REASON})"
+        ;;
+    installed)
+        ui_success "gum bootstrapped (${GUM_REASON}, v${GUM_VERSION})"
+        ;;
+    *)
+        if [[ -n "$GUM_REASON" && "$GUM_REASON" != "non-interactive shell (auto-disabled)" ]]; then
+            ui_info "gum skipped (${GUM_REASON})"
+        fi
+        ;;
     esac
 }
 
@@ -523,18 +523,18 @@ extract_openclaw_conflict_path() {
 
 cleanup_openclaw_bin_conflict() {
     local bin_path="$1"
-    if [[ -z "$bin_path" || ( ! -e "$bin_path" && ! -L "$bin_path" ) ]]; then
+    if [[ -z "$bin_path" || (! -e "$bin_path" && ! -L "$bin_path") ]]; then
         return 1
     fi
     local npm_bin=""
     npm_bin="$(npm_global_bin_dir 2>/dev/null || true)"
     if [[ -n "$npm_bin" && "$bin_path" != "$npm_bin/openclaw" ]]; then
         case "$bin_path" in
-            "/opt/homebrew/bin/openclaw"|"/usr/local/bin/openclaw")
-                ;;
-            *)
-                return 1
-                ;;
+        "/opt/homebrew/bin/openclaw" | "/usr/local/bin/openclaw")
+            ;;
+        *)
+            return 1
+            ;;
         esac
     fi
     if [[ -L "$bin_path" ]]; then
@@ -571,9 +571,9 @@ is_arch_linux() {
         local os_id
         os_id="$(grep -E '^ID=' /etc/os-release 2>/dev/null | cut -d'=' -f2 | tr -d '"' || true)"
         case "$os_id" in
-            arch|manjaro|endeavouros|arcolinux|garuda|archarm|cachyos|archcraft)
-                return 0
-                ;;
+        arch | manjaro | endeavouros | arcolinux | garuda | archarm | cachyos | archcraft)
+            return 0
+            ;;
         esac
         # Also check ID_LIKE for Arch derivatives
         local os_id_like
@@ -583,7 +583,7 @@ is_arch_linux() {
         fi
     fi
     # Fallback: check for pacman
-    if command -v pacman &> /dev/null; then
+    if command -v pacman &>/dev/null; then
         return 0
     fi
     return 1
@@ -611,13 +611,13 @@ apt_get_install() {
 install_build_tools_linux() {
     require_sudo
 
-    if command -v apt-get &> /dev/null; then
+    if command -v apt-get &>/dev/null; then
         run_quiet_step "Updating package index" apt_get_update
         run_quiet_step "Installing build tools" apt_get_install build-essential python3 make g++ cmake
         return 0
     fi
 
-    if command -v pacman &> /dev/null || is_arch_linux; then
+    if command -v pacman &>/dev/null || is_arch_linux; then
         if is_root; then
             run_quiet_step "Installing build tools" pacman -Sy --noconfirm base-devel python make cmake gcc
         else
@@ -626,7 +626,7 @@ install_build_tools_linux() {
         return 0
     fi
 
-    if command -v dnf &> /dev/null; then
+    if command -v dnf &>/dev/null; then
         if is_root; then
             run_quiet_step "Installing build tools" dnf install -y -q gcc gcc-c++ make cmake python3
         else
@@ -635,7 +635,7 @@ install_build_tools_linux() {
         return 0
     fi
 
-    if command -v yum &> /dev/null; then
+    if command -v yum &>/dev/null; then
         if is_root; then
             run_quiet_step "Installing build tools" yum install -y -q gcc gcc-c++ make cmake python3
         else
@@ -644,7 +644,7 @@ install_build_tools_linux() {
         return 0
     fi
 
-    if command -v apk &> /dev/null; then
+    if command -v apk &>/dev/null; then
         if is_root; then
             run_quiet_step "Installing build tools" apk add --no-cache build-base python3 cmake
         else
@@ -961,19 +961,19 @@ append_holiday_taglines() {
     month_day="$(date -u +%m-%d 2>/dev/null || date +%m-%d)"
 
     case "$month_day" in
-        "01-01") TAGLINES+=("$HOLIDAY_NEW_YEAR") ;;
-        "02-14") TAGLINES+=("$HOLIDAY_VALENTINES") ;;
-        "10-31") TAGLINES+=("$HOLIDAY_HALLOWEEN") ;;
-        "12-25") TAGLINES+=("$HOLIDAY_CHRISTMAS") ;;
+    "01-01") TAGLINES+=("$HOLIDAY_NEW_YEAR") ;;
+    "02-14") TAGLINES+=("$HOLIDAY_VALENTINES") ;;
+    "10-31") TAGLINES+=("$HOLIDAY_HALLOWEEN") ;;
+    "12-25") TAGLINES+=("$HOLIDAY_CHRISTMAS") ;;
     esac
 
     case "$today" in
-        "2025-01-29"|"2026-02-17"|"2027-02-06") TAGLINES+=("$HOLIDAY_LUNAR_NEW_YEAR") ;;
-        "2025-03-30"|"2025-03-31"|"2026-03-20"|"2027-03-10") TAGLINES+=("$HOLIDAY_EID") ;;
-        "2025-10-20"|"2026-11-08"|"2027-10-28") TAGLINES+=("$HOLIDAY_DIWALI") ;;
-        "2025-04-20"|"2026-04-05"|"2027-03-28") TAGLINES+=("$HOLIDAY_EASTER") ;;
-        "2025-11-27"|"2026-11-26"|"2027-11-25") TAGLINES+=("$HOLIDAY_THANKSGIVING") ;;
-        "2025-12-15"|"2025-12-16"|"2025-12-17"|"2025-12-18"|"2025-12-19"|"2025-12-20"|"2025-12-21"|"2025-12-22"|"2026-12-05"|"2026-12-06"|"2026-12-07"|"2026-12-08"|"2026-12-09"|"2026-12-10"|"2026-12-11"|"2026-12-12"|"2027-12-25"|"2027-12-26"|"2027-12-27"|"2027-12-28"|"2027-12-29"|"2027-12-30"|"2027-12-31"|"2028-01-01") TAGLINES+=("$HOLIDAY_HANUKKAH") ;;
+    "2025-01-29" | "2026-02-17" | "2027-02-06") TAGLINES+=("$HOLIDAY_LUNAR_NEW_YEAR") ;;
+    "2025-03-30" | "2025-03-31" | "2026-03-20" | "2027-03-10") TAGLINES+=("$HOLIDAY_EID") ;;
+    "2025-10-20" | "2026-11-08" | "2027-10-28") TAGLINES+=("$HOLIDAY_DIWALI") ;;
+    "2025-04-20" | "2026-04-05" | "2027-03-28") TAGLINES+=("$HOLIDAY_EASTER") ;;
+    "2025-11-27" | "2026-11-26" | "2027-11-25") TAGLINES+=("$HOLIDAY_THANKSGIVING") ;;
+    "2025-12-15" | "2025-12-16" | "2025-12-17" | "2025-12-18" | "2025-12-19" | "2025-12-20" | "2025-12-21" | "2025-12-22" | "2026-12-05" | "2026-12-06" | "2026-12-07" | "2026-12-08" | "2026-12-09" | "2026-12-10" | "2026-12-11" | "2026-12-12" | "2027-12-25" | "2027-12-26" | "2027-12-27" | "2027-12-28" | "2027-12-29" | "2027-12-30" | "2027-12-31" | "2028-01-01") TAGLINES+=("$HOLIDAY_HANUKKAH") ;;
     esac
 }
 
@@ -1063,65 +1063,65 @@ EOF
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --no-onboard)
-                NO_ONBOARD=1
-                shift
-                ;;
-            --onboard)
-                NO_ONBOARD=0
-                shift
-                ;;
-            --dry-run)
-                DRY_RUN=1
-                shift
-                ;;
-            --verbose)
-                VERBOSE=1
-                shift
-                ;;
-            --verify)
-                VERIFY_INSTALL=1
-                shift
-                ;;
-            --no-prompt)
-                NO_PROMPT=1
-                shift
-                ;;
-            --help|-h)
-                HELP=1
-                shift
-                ;;
-            --install-method|--method)
-                INSTALL_METHOD="$2"
-                shift 2
-                ;;
-            --version)
-                OPENCLAW_VERSION="$2"
-                shift 2
-                ;;
-            --beta)
-                USE_BETA=1
-                shift
-                ;;
-            --npm)
-                INSTALL_METHOD="npm"
-                shift
-                ;;
-            --git|--github)
-                INSTALL_METHOD="git"
-                shift
-                ;;
-            --git-dir|--dir)
-                GIT_DIR="$2"
-                shift 2
-                ;;
-            --no-git-update)
-                GIT_UPDATE=0
-                shift
-                ;;
-            *)
-                shift
-                ;;
+        --no-onboard)
+            NO_ONBOARD=1
+            shift
+            ;;
+        --onboard)
+            NO_ONBOARD=0
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        --verbose)
+            VERBOSE=1
+            shift
+            ;;
+        --verify)
+            VERIFY_INSTALL=1
+            shift
+            ;;
+        --no-prompt)
+            NO_PROMPT=1
+            shift
+            ;;
+        --help | -h)
+            HELP=1
+            shift
+            ;;
+        --install-method | --method)
+            INSTALL_METHOD="$2"
+            shift 2
+            ;;
+        --version)
+            OPENCLAW_VERSION="$2"
+            shift 2
+            ;;
+        --beta)
+            USE_BETA=1
+            shift
+            ;;
+        --npm)
+            INSTALL_METHOD="npm"
+            shift
+            ;;
+        --git | --github)
+            INSTALL_METHOD="git"
+            shift
+            ;;
+        --git-dir | --dir)
+            GIT_DIR="$2"
+            shift 2
+            ;;
+        --no-git-update)
+            GIT_UPDATE=0
+            shift
+            ;;
+        *)
+            shift
+            ;;
         esac
     done
 }
@@ -1153,8 +1153,8 @@ prompt_choice() {
     if ! is_promptable; then
         return 1
     fi
-    echo -e "$prompt" > /dev/tty
-    read -r answer < /dev/tty || true
+    echo -e "$prompt" >/dev/tty
+    read -r answer </dev/tty || true
     echo "$answer"
 }
 
@@ -1173,40 +1173,41 @@ Choose install method"
             --header "$header" \
             --cursor-prefix "❯ " \
             "git  · update this checkout and use it" \
-            "npm  · install globally via npm" < /dev/tty || true)"
+            "npm  · install globally via npm" </dev/tty || true)"
 
         case "$selection" in
-            git*)
-                echo "git"
-                return 0
-                ;;
-            npm*)
-                echo "npm"
-                return 0
-                ;;
+        git*)
+            echo "git"
+            return 0
+            ;;
+        npm*)
+            echo "npm"
+            return 0
+            ;;
         esac
         return 1
     fi
 
     local choice=""
-    choice="$(prompt_choice "$(cat <<EOF
+    choice="$(prompt_choice "$(
+        cat <<EOF
 ${WARN}→${NC} Detected a OpenClaw source checkout in: ${INFO}${detected_checkout}${NC}
 Choose install method:
   1) Update this checkout (git) and use it
   2) Install global via npm (migrate away from git)
 Enter 1 or 2:
 EOF
-)" || true)"
+    )" || true)"
 
     case "$choice" in
-        1)
-            echo "git"
-            return 0
-            ;;
-        2)
-            echo "npm"
-            return 0
-            ;;
+    1)
+        echo "git"
+        return 0
+        ;;
+    2)
+        echo "npm"
+        return 0
+        ;;
     esac
 
     return 1
@@ -1253,7 +1254,7 @@ print_homebrew_admin_fix() {
 
 install_homebrew() {
     if [[ "$OS" == "macos" ]]; then
-        if ! command -v brew &> /dev/null; then
+        if ! command -v brew &>/dev/null; then
             if ! is_macos_admin_user; then
                 print_homebrew_admin_fix
                 exit 1
@@ -1276,7 +1277,7 @@ install_homebrew() {
 
 # Check Node.js version
 parse_node_version_components() {
-    if ! command -v node &> /dev/null; then
+    if ! command -v node &>/dev/null; then
         return 1
     fi
     local version major minor
@@ -1300,7 +1301,7 @@ parse_node_version_components() {
 node_major_version() {
     local version_components major minor
     version_components="$(parse_node_version_components || true)"
-    read -r major minor <<< "$version_components"
+    read -r major minor <<<"$version_components"
     if [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]]; then
         echo "$major"
         return 0
@@ -1311,7 +1312,7 @@ node_major_version() {
 node_is_at_least_required() {
     local version_components major minor
     version_components="$(parse_node_version_components || true)"
-    read -r major minor <<< "$version_components"
+    read -r major minor <<<"$version_components"
     if [[ ! "$major" =~ ^[0-9]+$ || ! "$minor" =~ ^[0-9]+$ ]]; then
         return 1
     fi
@@ -1325,7 +1326,7 @@ node_is_at_least_required() {
 }
 
 print_active_node_paths() {
-    if ! command -v node &> /dev/null; then
+    if ! command -v node &>/dev/null; then
         return 1
     fi
     local node_path node_version npm_path npm_version
@@ -1333,7 +1334,7 @@ print_active_node_paths() {
     node_version="$(node -v 2>/dev/null || true)"
     ui_info "Active Node.js: ${node_version:-unknown} (${node_path:-unknown})"
 
-    if command -v npm &> /dev/null; then
+    if command -v npm &>/dev/null; then
         npm_path="$(command -v npm 2>/dev/null || true)"
         npm_version="$(npm -v 2>/dev/null || true)"
         ui_info "Active npm: ${npm_version:-unknown} (${npm_path:-unknown})"
@@ -1347,7 +1348,7 @@ ensure_macos_default_node_active() {
     fi
 
     local brew_node_prefix=""
-    if command -v brew &> /dev/null; then
+    if command -v brew &>/dev/null; then
         brew_node_prefix="$(brew --prefix "node@${NODE_DEFAULT_MAJOR}" 2>/dev/null || true)"
         if [[ -n "$brew_node_prefix" && -x "${brew_node_prefix}/bin/node" ]]; then
             export PATH="${brew_node_prefix}/bin:$PATH"
@@ -1435,7 +1436,7 @@ load_nvm_for_node_detection() {
 }
 
 check_node() {
-    if command -v node &> /dev/null; then
+    if command -v node &>/dev/null; then
         NODE_VERSION="$(node_major_version || true)"
         if node_is_at_least_required; then
             ui_success "Node.js v$(node -v | cut -d'v' -f2) found"
@@ -1480,7 +1481,7 @@ install_node() {
         fi
 
         # Arch-based distros: use pacman with official repos
-        if command -v pacman &> /dev/null || is_arch_linux; then
+        if command -v pacman &>/dev/null || is_arch_linux; then
             ui_info "Installing Node.js via pacman (Arch-based distribution detected)"
             if is_root; then
                 run_quiet_step "Installing Node.js" pacman -Sy --noconfirm nodejs npm
@@ -1493,7 +1494,7 @@ install_node() {
         fi
 
         ui_info "Installing Node.js via NodeSource"
-        if command -v apt-get &> /dev/null; then
+        if command -v apt-get &>/dev/null; then
             local tmp
             tmp="$(mktempfile)"
             run_quiet_step "Downloading NodeSource setup script" download_file "https://deb.nodesource.com/setup_${NODE_DEFAULT_MAJOR}.x" "$tmp"
@@ -1504,7 +1505,7 @@ install_node() {
                 run_quiet_step "Configuring NodeSource repository" sudo -E bash "$tmp"
                 run_quiet_step "Installing Node.js" apt_get_install nodejs
             fi
-        elif command -v dnf &> /dev/null; then
+        elif command -v dnf &>/dev/null; then
             local tmp
             tmp="$(mktempfile)"
             run_quiet_step "Downloading NodeSource setup script" download_file "https://rpm.nodesource.com/setup_${NODE_DEFAULT_MAJOR}.x" "$tmp"
@@ -1515,7 +1516,7 @@ install_node() {
                 run_quiet_step "Configuring NodeSource repository" sudo bash "$tmp"
                 run_quiet_step "Installing Node.js" sudo dnf install -y -q nodejs
             fi
-        elif command -v yum &> /dev/null; then
+        elif command -v yum &>/dev/null; then
             local tmp
             tmp="$(mktempfile)"
             run_quiet_step "Downloading NodeSource setup script" download_file "https://rpm.nodesource.com/setup_${NODE_DEFAULT_MAJOR}.x" "$tmp"
@@ -1539,7 +1540,7 @@ install_node() {
 
 # Check Git
 check_git() {
-    if command -v git &> /dev/null; then
+    if command -v git &>/dev/null; then
         ui_success "Git already installed"
         return 0
     fi
@@ -1571,7 +1572,7 @@ require_sudo() {
     if is_root; then
         return 0
     fi
-    if command -v sudo &> /dev/null; then
+    if command -v sudo &>/dev/null; then
         if ! sudo -n true >/dev/null 2>&1; then
             ui_info "Administrator privileges required; enter your password"
             sudo -v
@@ -1588,22 +1589,22 @@ install_git() {
         run_quiet_step "Installing Git" brew install git
     elif [[ "$OS" == "linux" ]]; then
         require_sudo
-        if command -v apt-get &> /dev/null; then
+        if command -v apt-get &>/dev/null; then
             run_quiet_step "Updating package index" apt_get_update
             run_quiet_step "Installing Git" apt_get_install git
-        elif command -v pacman &> /dev/null || is_arch_linux; then
+        elif command -v pacman &>/dev/null || is_arch_linux; then
             if is_root; then
                 run_quiet_step "Installing Git" pacman -Sy --noconfirm git
             else
                 run_quiet_step "Installing Git" sudo pacman -Sy --noconfirm git
             fi
-        elif command -v dnf &> /dev/null; then
+        elif command -v dnf &>/dev/null; then
             if is_root; then
                 run_quiet_step "Installing Git" dnf install -y -q git
             else
                 run_quiet_step "Installing Git" sudo dnf install -y -q git
             fi
-        elif command -v yum &> /dev/null; then
+        elif command -v yum &>/dev/null; then
             if is_root; then
                 run_quiet_step "Installing Git" yum install -y -q git
             else
@@ -1644,7 +1645,7 @@ fix_npm_permissions() {
     local path_line='export PATH="$HOME/.npm-global/bin:$PATH"'
     for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
         if [[ -f "$rc" ]] && ! grep -q ".npm-global" "$rc"; then
-            echo "$path_line" >> "$rc"
+            echo "$path_line" >>"$rc"
         fi
     done
 
@@ -1701,11 +1702,11 @@ pnpm_cmd_is_ready() {
 }
 
 detect_pnpm_cmd() {
-    if command -v pnpm &> /dev/null; then
+    if command -v pnpm &>/dev/null; then
         set_pnpm_cmd pnpm
         return 0
     fi
-    if command -v corepack &> /dev/null; then
+    if command -v corepack &>/dev/null; then
         if corepack pnpm --version >/dev/null 2>&1; then
             set_pnpm_cmd corepack pnpm
             return 0
@@ -1720,7 +1721,7 @@ ensure_pnpm() {
         return 0
     fi
 
-    if command -v corepack &> /dev/null; then
+    if command -v corepack &>/dev/null; then
         ui_info "Configuring pnpm via Corepack"
         corepack enable >/dev/null 2>&1 || true
         if ! run_quiet_step "Activating pnpm" corepack prepare pnpm@10 --activate; then
@@ -1804,7 +1805,7 @@ ensure_user_local_bin_on_path() {
     local path_line='export PATH="$HOME/.local/bin:$PATH"'
     for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
         if [[ -f "$rc" ]] && ! grep -q ".local/bin" "$rc"; then
-            echo "$path_line" >> "$rc"
+            echo "$path_line" >>"$rc"
         fi
     done
 }
@@ -1924,7 +1925,7 @@ find_openclaw_global_installs() {
         real_package_dir="$(canonicalize_dir "$package_dir" || true)"
         [[ -n "$real_package_dir" ]] || real_package_dir="$package_dir"
         case "$seen" in
-            *"|${real_package_dir}|"*) continue ;;
+        *"|${real_package_dir}|"*) continue ;;
         esac
         seen="${seen}${real_package_dir}|"
 
@@ -1963,7 +1964,7 @@ warn_duplicate_openclaw_global_installs() {
 
     local install version package_dir npm_root
     for install in "${installs[@]}"; do
-        IFS=$'\t' read -r version package_dir npm_root <<< "$install"
+        IFS=$'\t' read -r version package_dir npm_root <<<"$install"
         echo -e "    - ${INFO}${version:-unknown}${NC}  ${package_dir}"
         echo -e "      npm root: ${MUTED}${npm_root}${NC}"
     done
@@ -1984,8 +1985,8 @@ path_has_dir() {
         return 1
     fi
     case ":${path}:" in
-        *":${dir}:"*) return 0 ;;
-        *) return 1 ;;
+    *":${dir}:"*) return 0 ;;
+    *) return 1 ;;
     esac
 }
 
@@ -2015,7 +2016,7 @@ ensure_npm_global_bin_on_path() {
 }
 
 maybe_nodenv_rehash() {
-    if command -v nodenv &> /dev/null; then
+    if command -v nodenv &>/dev/null; then
         nodenv rehash >/dev/null 2>&1 || true
     fi
 }
@@ -2028,7 +2029,7 @@ warn_openclaw_not_found() {
     if [[ "$t" == "alias" || "$t" == "function" ]]; then
         ui_warn "Found a shell ${t} named openclaw; it may shadow the real binary"
     fi
-    if command -v nodenv &> /dev/null; then
+    if command -v nodenv &>/dev/null; then
         echo -e "Using nodenv? Run: ${INFO}nodenv rehash${NC}"
     fi
 
@@ -2126,7 +2127,7 @@ install_openclaw_from_git() {
 
     ensure_user_local_bin_on_path
 
-    cat > "$HOME/.local/bin/openclaw" <<EOF
+    cat >"$HOME/.local/bin/openclaw" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 exec node "${repo_dir}/dist/entry.js" "\$@"
@@ -2230,7 +2231,7 @@ install_openclaw() {
     fi
 
     if [[ "${OPENCLAW_VERSION}" == "latest" && "${package_name}" == "openclaw" ]]; then
-        if ! resolve_openclaw_bin &> /dev/null; then
+        if ! resolve_openclaw_bin &>/dev/null; then
             ui_warn "npm install openclaw@latest failed; retrying openclaw@next"
             cleanup_npm_openclaw_paths
             install_openclaw_npm "openclaw@next"
@@ -2339,21 +2340,21 @@ load_install_version_helpers() {
 load_install_version_helpers
 
 if ! declare -F extract_openclaw_semver >/dev/null 2>&1; then
-# Inline fallback when version-parse.sh could not be sourced (for example, stdin install).
-extract_openclaw_semver() {
-    local raw="${1:-}"
-    raw="${raw//$'\r'/}"
-    if [[ "$raw" =~ v?([0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?(\+[0-9A-Za-z.-]+)?) ]]; then
-        printf '%s' "${BASH_REMATCH[1]}"
-    fi
-}
+    # Inline fallback when version-parse.sh could not be sourced (for example, stdin install).
+    extract_openclaw_semver() {
+        local raw="${1:-}"
+        raw="${raw//$'\r'/}"
+        if [[ "$raw" =~ v?([0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?(\+[0-9A-Za-z.-]+)?) ]]; then
+            printf '%s' "${BASH_REMATCH[1]}"
+        fi
+    }
 fi
 
 resolve_openclaw_version() {
     local version=""
     local raw_version_output=""
     local claw="${OPENCLAW_BIN:-}"
-    if [[ -z "$claw" ]] && command -v openclaw &> /dev/null; then
+    if [[ -z "$claw" ]] && command -v openclaw &>/dev/null; then
         claw="$(command -v openclaw)"
     fi
     if [[ -n "$claw" ]]; then
@@ -2492,14 +2493,14 @@ main() {
             local selected_method=""
             selected_method="$(choose_install_method_interactive "$detected_checkout" || true)"
             case "$selected_method" in
-                git|npm)
-                    INSTALL_METHOD="$selected_method"
-                    ;;
-                *)
-                    ui_error "no install method selected"
-                    echo "Re-run with: --install-method git|npm (or set OPENCLAW_INSTALL_METHOD)."
-                    exit 2
-                    ;;
+            git | npm)
+                INSTALL_METHOD="$selected_method"
+                ;;
+            *)
+                ui_error "no install method selected"
+                echo "Re-run with: --install-method git|npm (or set OPENCLAW_INSTALL_METHOD)."
+                exit 2
+                ;;
             esac
         fi
     fi
@@ -2690,12 +2691,12 @@ main() {
             fi
             ui_info "Running openclaw doctor"
             local doctor_ok=0
-            if (( ${#doctor_args[@]} )); then
+            if ((${#doctor_args[@]})); then
                 OPENCLAW_UPDATE_IN_PROGRESS=1 "$claw" doctor "${doctor_args[@]}" </dev/null && doctor_ok=1
             else
                 OPENCLAW_UPDATE_IN_PROGRESS=1 "$claw" doctor </dev/tty && doctor_ok=1
             fi
-            if (( doctor_ok )); then
+            if ((doctor_ok)); then
                 ui_info "Updating plugins"
                 OPENCLAW_UPDATE_IN_PROGRESS=1 "$claw" plugins update --all || true
             else
@@ -2736,7 +2737,7 @@ main() {
         fi
     fi
 
-    if command -v openclaw &> /dev/null; then
+    if command -v openclaw &>/dev/null; then
         local claw="${OPENCLAW_BIN:-}"
         if [[ -z "$claw" ]]; then
             claw="$(resolve_openclaw_bin || true)"
