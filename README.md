@@ -28,15 +28,13 @@
 
 - `Windows`版本由于系统原因，无法使用简化版的交互向导，所以全部采用 `onboard` 的非交互模式（`--non-interactive`）+ 自研模型交互 + 自动配置 `skills` 的方式。用户无需选择 `hooks`。
 
-#### 3. 配置 hooks
+#### 3. 配置 Hooks
 
-`Linux/macOS/WSL` 版本在进行交互式 `onboard` 时，会自带 hooks 的交互配置。
+`Linux/macOS/WSL` 版本在进行交互式 `onboard` 时，会自带 Hooks 的交互配置。
 
-`Windows` 版本使用的是非交互式 `onboard`，会跳过 hooks 配置，所以会启用自研的 hooks 交互机制。
+`Windows` 版本使用的是非交互式 `onboard`，不会配置 Hooks，所以会通过主动执行命令来启用 Hooks。
 
 #### 4. 预装常用 Skills
-
-以下是常用 Skills，会以交互的形式让用户选择并安装。
 
 ```tex
 'self-improving-agent',		自我迭代智能体
