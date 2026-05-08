@@ -2616,6 +2616,21 @@ resolve_supplied_install_profile() {
     echo "${resolved_profile}"
 }
 
+# 追加 quickstart onboard 参数到指定命令数组
+# 目的是简化 onboard 流程，只保留最必要的步骤（主要是模型和网关）
+append_quickstart_onboard_flags() {
+    local -n cmd_ref="$1"
+    cmd_ref+=("--accept-risk")
+    cmd_ref+=("--reset")
+    cmd_ref+=("--reset-scope" "full")
+    cmd_ref+=("--flow" "quickstart")
+    cmd_ref+=("--skip-channels")
+    cmd_ref+=("--skip-skills")
+    cmd_ref+=("--skip-search")
+    cmd_ref+=("--skip-ui")
+    cmd_ref+=("--json")
+}
+
 # 构造 openclaw onboard 命令数组到 ONBOARD_CMD（实际执行使用）
 build_onboard_command() {
     local claw="$1"
@@ -2632,7 +2647,7 @@ build_onboard_command() {
     if [[ -n "${INSTALL_GATEWAY_PORT}" ]]; then
         ONBOARD_CMD+=("--gateway-port" "${INSTALL_GATEWAY_PORT}")
     fi
-    # todo: 添加其他 onboard 参数
+    append_quickstart_onboard_flags ONBOARD_CMD
 }
 
 # 构造可显示给用户的 onboard 命令数组（使用 openclaw 而非绝对路径）
@@ -2651,6 +2666,7 @@ build_onboard_display_command() {
     if [[ -n "${INSTALL_GATEWAY_PORT}" ]]; then
         ONBOARD_DISPLAY_CMD+=("--gateway-port" "${INSTALL_GATEWAY_PORT}")
     fi
+    append_quickstart_onboard_flags ONBOARD_DISPLAY_CMD
 }
 
 # 把展示用的 onboard 命令格式化为单行字符串
@@ -3062,7 +3078,6 @@ main() {
             fi
 
             # 在有 TTY（终端交互环境）时，执行 onboarding 命令
-            # todo: 重新拼接交互式的 onboard 命令
             ui_info "Starting setup"
             echo ""
             if [[ -r /dev/tty && -w /dev/tty ]]; then
@@ -3081,7 +3096,6 @@ main() {
             fi
 
             # 在没有 TTY（终端交互环境）时，提示用户需要手动运行 onboarding
-            # todo: 重新拼接非交互式的 onboard 命令，而不是仅仅是提示
             local onboard_cmd=""
             onboard_cmd="$(format_onboard_display_command)"
             ui_info "No TTY; run ${onboard_cmd} to finish setup"
