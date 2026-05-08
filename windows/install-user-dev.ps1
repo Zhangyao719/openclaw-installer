@@ -12,7 +12,7 @@
 # 2 Git        — 2.1 检测；2.2 进程 PATH；2.3 便携目录与 git.exe；2.4 启用便携；2.5 解析 MinGit；2.6 安装便携；2.7 确保可用
 # 3 命令与 PATH — openclaw/npm/pnpm 路径、调用、全局 bin、补全 PATH、确保 pnpm
 # 4 安装本体   — 4.1 npm 包说明；4.2 npm 全局安装；4.3 Git 源码克隆构建；4.4.1/4.4.2 遗留子模块目录解析与删除；
-# 5 装后       — 5.1 doctor 迁移；5.2 网关服务刷新；5.3 onboard 向导；5.4 预装 Skills（全新安装）；
+# 5 装后       — 5.1 doctor 迁移；5.2 网关服务刷新；5.3 onboard 向导；5.4 配置 Hooks；5.5 预装 Skills（全新安装）；
 # 6 Main       — 主函数
 # 7 Dashboard  — 获取并打开链接
 
@@ -990,6 +990,179 @@ function Invoke-OnboardWizard {
     ) + $extraArgs
 
     Invoke-OpenClawCommand @onboardArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "[!] onboard 失败（退出码 $LASTEXITCODE），将跳过 Hooks 与 Skills 安装。" -ForegroundColor Red
+        return $false
+    }
+    return $true
+}
+
+function Test-OpenClawSkipHooksEnv {
+    return ($env:OPENCLAW_SKIP_HOOKS -eq "1")
+}
+
+function Test-HooksConsoleUiAvailable {
+    try {
+        if ([Console]::IsInputRedirected) {
+            return $false
+        }
+        if ([Console]::IsOutputRedirected) {
+            return $false
+        }
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+# 返回待 enable 的 hook 技术名列表；空列表表示跳过或不选任何 hook。
+function Invoke-HooksSelectionUi {
+    $items = @(
+        @{ Slug = "session-memory"; Line = "session-memory — /new、/reset 时保存会话摘要到 memory/" }
+        @{ Slug = "bootstrap-extra-files"; Line = "bootstrap-extra-files — 引导时按 glob 额外注入 AGENTS.md 等" }
+        @{ Slug = "command-logger"; Line = "command-logger — 将所有 slash 命令写入 commands.log" }
+        @{ Slug = "compaction-notifier"; Line = "compaction-notifier — 会话压缩开始/结束时在聊天中提示" }
+        @{ Slug = "boot-md"; Line = "boot-md — 网关启动后执行工作区 BOOT.md" }
+        @{ Slug = "_skip"; Line = "跳过 — 暂不启用上述内置 Hooks（与其它选项互斥）" }
+    )
+
+    $count = $items.Count
+    $selected = New-Object bool[] $count
+    $cursor = 0
+    $skipIndex = $count - 1
+
+    while ($true) {
+        Clear-Host
+        Write-Host ""
+        Write-Host "━━━ 选择要启用的内置 Hooks（空格多选，回车确认）━━━" -ForegroundColor Cyan
+        Write-Host ""
+
+        for ($i = 0; $i -lt $count; $i++) {
+            $arrow = if ($i -eq $cursor) { ">" } else { " " }
+            $box = if ($selected[$i]) { "[x]" } else { "[ ]" }
+            Write-Host ("  {0} {1} {2}" -f $arrow, $box, $items[$i].Line)
+        }
+
+        Write-Host ""
+        Write-Host "↑↓ 移动焦点 │ 空格 选中/取消 │ 回车 确认" -ForegroundColor Gray
+
+        $key = [Console]::ReadKey($true)
+
+        switch ($key.Key) {
+            "UpArrow" {
+                $cursor = ($cursor + $count - 1) % $count
+            }
+            "DownArrow" {
+                $cursor = ($cursor + 1) % $count
+            }
+            "Spacebar" {
+                if ($cursor -eq $skipIndex) {
+                    $flip = -not $selected[$skipIndex]
+                    for ($j = 0; $j -lt $count; $j++) {
+                        $selected[$j] = $false
+                    }
+                    $selected[$skipIndex] = $flip
+                }
+                else {
+                    $selected[$skipIndex] = $false
+                    $selected[$cursor] = -not $selected[$cursor]
+                }
+            }
+            "Enter" {
+                $slugs = [System.Collections.Generic.List[string]]::new()
+                if (-not $selected[$skipIndex]) {
+                    for ($j = 0; $j -lt $skipIndex; $j++) {
+                        if ($selected[$j]) {
+                            $slugs.Add($items[$j].Slug)
+                        }
+                    }
+                }
+                return @([string[]]$slugs.ToArray())
+            }
+            Default { }
+        }
+    }
+}
+
+function Invoke-HooksConfigureStep {
+    if (Test-OpenClawSkipHooksEnv) {
+        Write-Host "[*] 已设置 OPENCLAW_SKIP_HOOKS=1，跳过 Hooks 配置。" -ForegroundColor Gray
+        return
+    }
+
+    if (-not (Test-HooksConsoleUiAvailable)) {
+        Write-Host "[*] 未检测到交互式终端（输入或输出已重定向），跳过 Hooks 配置。" -ForegroundColor Gray
+        return
+    }
+
+    if (-not (Get-OpenClawCommandPath)) {
+        Write-Host "[!] 未找到 openclaw 命令，跳过 Hooks 配置。" -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host ""
+    Write-Host "即将配置内置 Hooks（可在无 TTY 或 OPENCLAW_SKIP_HOOKS=1 时自动跳过）。" -ForegroundColor Cyan
+
+    $prevVisible = $true
+    try {
+        $prevVisible = [Console]::CursorVisible
+        [Console]::CursorVisible = $false
+    }
+    catch {
+        # 部分宿主不支持
+    }
+
+    $toEnable = @()
+    try {
+        $toEnable = Invoke-HooksSelectionUi
+    }
+    finally {
+        try {
+            [Console]::CursorVisible = $prevVisible
+        }
+        catch {
+            # ignore
+        }
+    }
+
+    Write-Host ""
+
+    if ($toEnable.Count -eq 0) {
+        Write-Host "[OK] 已跳过 Hooks 启用。" -ForegroundColor Green
+        return
+    }
+
+    Write-Host "[*] 正在启用选中的 Hooks..." -ForegroundColor Yellow
+    $failed = @()
+
+    foreach ($slug in $toEnable) {
+        Write-Host "  hooks enable $slug ..." -ForegroundColor Gray
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            Invoke-OpenClawCommand hooks enable $slug
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[!] hooks enable $slug 失败（退出码 $LASTEXITCODE）" -ForegroundColor Yellow
+                $failed += $slug
+            }
+        }
+        catch {
+            Write-Host "[!] hooks enable ${slug}: $($_.Exception.Message)" -ForegroundColor Yellow
+            $failed += $slug
+        }
+        finally {
+            $ErrorActionPreference = $prevEap
+        }
+    }
+
+    if ($failed.Count -eq 0) {
+        Write-Host "[OK] 所选 Hooks 已全部启用。" -ForegroundColor Green
+    }
+    else {
+        Write-Host "[!] 部分 Hooks 启用失败: $($failed -join ', ')" -ForegroundColor Yellow
+    }
 }
 
 # 从 ClawHub 逐个安装预设 Skills；单个失败只警告不阻断；升级场景不调用。
@@ -1192,6 +1365,9 @@ function Main {
     }
 
     # Process 5.3: onboard
+    $onboardRan = $false
+    $onboardOk = $false
+
     if ($isUpgrade) {
         Write-Host "升级完成，您可以运行 " -NoNewline
         Write-Host "openclaw doctor" -ForegroundColor Cyan -NoNewline
@@ -1199,26 +1375,43 @@ function Main {
         Write-Host ""
 
         if (Ask-YesNo -Prompt "是否开始 onboard 向导（警告：会清空当前所有配置）？" -Default "N") {
-            Invoke-OnboardWizard
+            $onboardRan = $true
+            $onboardOk = Invoke-OnboardWizard
         }
     }
     else {
         Write-Host "即将开始 onboard 向导，请提前准备模型相关配置。" -ForegroundColor Cyan
-        Invoke-OnboardWizard
+        $onboardRan = $true
+        $onboardOk = Invoke-OnboardWizard
     }
 
-    # Process 5.4: 预装 Skills
-    if ($isUpgrade) {
-        Write-Host ""
-        if (Ask-YesNo -Prompt "是否安装预设 Skills（注意：可能会覆盖当前配置）？" -Default "Y") {
-            Write-Host "即将开始预安装常用 Skills..." -ForegroundColor Cyan
-            Install-Skills
+    if ($onboardRan) {
+        if ($onboardOk) {
+            Invoke-HooksConfigureStep
+
+            # Process 5.4: 预装 Skills
+            if ($isUpgrade) {
+                Write-Host ""
+                if (Ask-YesNo -Prompt "是否安装预设 Skills（注意：可能会覆盖当前配置）？" -Default "Y") {
+                    Write-Host "即将开始预安装常用 Skills..." -ForegroundColor Cyan
+                    Install-Skills
+                }
+            }
+            else {
+                Write-Host ""
+                Write-Host "即将开始预安装常用 Skills..." -ForegroundColor Cyan
+                Install-Skills
+            }
         }
     }
     else {
-        Write-Host ""
-        Write-Host "即将开始预安装常用 Skills..." -ForegroundColor Cyan
-        Install-Skills
+        if ($isUpgrade) {
+            Write-Host ""
+            if (Ask-YesNo -Prompt "是否安装预设 Skills（注意：可能会覆盖当前配置）？" -Default "Y") {
+                Write-Host "即将开始预安装常用 Skills..." -ForegroundColor Cyan
+                Install-Skills
+            }
+        }
     }
 
     return $true
