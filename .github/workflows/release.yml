@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install PowerShell
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https software-properties-common
+          . /etc/os-release
+          wget -q "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb" -O /tmp/packages-microsoft-prod.deb
+          sudo dpkg -i /tmp/packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
+          pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+
+      - name: Install shfmt
+        run: |
+          set -e
+          curl -fsSL -o /tmp/shfmt https://github.com/mvdan/sh/releases/download/v3.13.1/shfmt_v3.13.1_linux_amd64
+          sudo install -m 0755 /tmp/shfmt /usr/local/bin/shfmt
+          shfmt -version
+
+      - name: Build dist/
+        run: node scripts/build-release.cjs
+
+      - name: Verify shell dist scripts
+        run: |
+          set -e
+          shopt -s nullglob
+          for f in dist/*.sh; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
+
+      - name: Verify PowerShell dist scripts
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/verify-dist-ps1-parse.ps1
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME:?}"
+          ls -la dist/
+          gh release create "$tag" --generate-notes dist/*
